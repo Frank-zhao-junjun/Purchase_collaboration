@@ -303,3 +303,31 @@ npx server -l 5000
 ### 待执行
 
 - 无（全部 Phase 已完成）
+
+## 预览与部署链路
+
+### 项目类型判断
+- `project_type = "web"`：核心实现围绕浏览器可访问的前端界面（React + Ant Design），通过 Vite 开发服务器提供预览
+- 可预览：是
+
+### .coze 配置结构
+- 技术项目根目录与工作区根目录重合（`path = "."`），根 `.coze` 同时承担子项目 `.coze` 职责
+- `sub_id = "e887fee0"`（不可修改）
+- `requires = ["nodejs-24", "python-3.12"]`
+
+### 预览链路（[dev]）
+- **build**：`scripts/coze-preview-build.sh` — 安装前端依赖（pnpm）、后端依赖（pip3）、初始化数据库
+- **run**：`scripts/coze-preview-run.sh` — 启动后端（uvicorn，端口 8000，后台）+ 启动前端 Vite 开发服务器（端口 5000，前台常驻）
+- 前端 Vite 通过 `vite.config.ts` 代理所有 API 路径到后端 8000 端口
+- 脚本具备幂等性：每次执行先清理 5000 端口残留进程
+
+### 部署链路（[deploy]）
+- `deploy.profile.kind = "service"`, `deploy.profile.flavor = "web"`
+- **build**：`scripts/coze-deploy-build.sh` — 安装依赖 + 前端构建（`pnpm run build`）
+- **run**：`scripts/coze-deploy-run.sh` — 初始化数据库 + 启动后端（端口 8000，后台）+ 启动 `server.mjs` 静态文件服务（端口 5000，前台）
+- `server.mjs` 负责提供前端静态文件并代理 API 请求到后端
+
+### 注意事项
+- 后端使用 SQLite，数据库文件 `backend/supply_chain.db`，每次启动前通过 `init_db.py` 初始化
+- 前端 Node.js 项目只使用 `pnpm`
+- 9000 端口为系统保留，禁止使用
