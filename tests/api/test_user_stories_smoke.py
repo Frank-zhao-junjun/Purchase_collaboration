@@ -571,9 +571,11 @@ def test_us_301_1(client):
             "items_data": [{"material_name": "高粱", "material_id": 1, "quantity": 50}],
         },
     )
+    assert cr.status_code == 200
     fid = cr.json()["id"]
     r = client.post(f"/collaboration/forecasts/{fid}/publish")
     assert r.status_code == 200
+    assert r.json()["status"] == "published"
     ST.matrix_forecast_id = fid
 
 
@@ -581,6 +583,8 @@ def test_us_301_2(client):
     """供应商查看采购预测"""
     r = client.get("/collaboration/forecasts", params={"supplier_id": 1})
     assert r.status_code == 200
+    rows = r.json()
+    assert any(f["id"] == ST.matrix_forecast_id for f in rows)
 
 
 def test_us_302_1(client):
@@ -594,12 +598,16 @@ def test_us_302_1(client):
         },
     )
     assert r.status_code == 200
+    assert r.json()["success"] is True
 
 
 def test_us_302_2(client):
     """采购方查看产能响应"""
     r = client.get(f"/collaboration/forecasts/{ST.matrix_forecast_id}/responses")
     assert r.status_code == 200
+    rows = r.json()
+    assert len(rows) >= 1
+    assert rows[0]["supplier_id"] == 1
 
 
 def test_us_303_1(client):
@@ -632,12 +640,14 @@ def test_us_304_1(client):
         json={"status": "cancelled", "notes": "US-304-1 关闭"},
     )
     assert r.status_code == 200
+    assert r.json().get("status") == "cancelled" or r.json().get("success")
 
 
 def test_us_304_2(client):
     """供应商查看订单状态"""
     r = client.get(f"/purchase-orders/{ST.matrix_po_id}")
     assert r.status_code == 200
+    assert r.json()["status"] == "cancelled"
 
 
 def test_us_305_1(client):
@@ -652,6 +662,7 @@ def test_us_305_1(client):
             ],
         },
     )
+    assert po.status_code == 201
     pid = po.json()["id"]
     ST.delivery_po_id = pid
     r = client.post(
@@ -664,6 +675,7 @@ def test_us_305_1(client):
         },
     )
     assert r.status_code == 200
+    assert r.json()["status"] == "pending"
     ST.delivery_schedule_id = r.json()["id"]
 
 
@@ -671,6 +683,7 @@ def test_us_305_2(client):
     """供应商查看要货计划"""
     r = client.get("/collaboration/delivery-schedules", params={"supplier_id": 1})
     assert r.status_code == 200
+    assert any(s["id"] == ST.delivery_schedule_id for s in r.json())
 
 
 def test_us_306_1(client):
@@ -680,12 +693,15 @@ def test_us_306_1(client):
         json={"supplier_id": 1, "confirmed": True},
     )
     assert r.status_code == 200
+    assert r.json()["status"] == "confirmed"
 
 
 def test_us_306_2(client):
     """采购方查看已确认要货计划"""
     r = client.get("/collaboration/delivery-schedules")
     assert r.status_code == 200
+    match = next(s for s in r.json() if s["id"] == ST.delivery_schedule_id)
+    assert match["status"] == "confirmed"
 
 
 def test_us_307_1(client):
@@ -708,26 +724,33 @@ def test_us_307_1(client):
         },
     )
     assert r.status_code == 200
-    ST.shipment_note_id = r.json()["id"]
+    body = r.json()
+    assert body["status"] == "draft"
+    ST.shipment_note_id = body["id"]
 
 
 def test_us_307_2(client):
     """采购方查看 ASN"""
     r = client.get("/logistics/shipment-notes/")
     assert r.status_code == 200
+    assert any(n["id"] == ST.shipment_note_id for n in r.json())
 
 
 def test_us_308_1(client):
     """采购方批准送货计划"""
-    client.post(f"/logistics/shipment-notes/{ST.shipment_note_id}/submit")
+    sub = client.post(f"/logistics/shipment-notes/{ST.shipment_note_id}/submit")
+    assert sub.status_code == 200
+    assert sub.json()["status"] == "submitted"
     r = client.post(f"/logistics/shipment-notes/{ST.shipment_note_id}/approve")
     assert r.status_code == 200
+    assert r.json()["status"] == "approved"
 
 
 def test_us_308_2(client):
     """供应商查看 ASN 状态"""
     r = client.get(f"/logistics/shipment-notes/{ST.shipment_note_id}")
     assert r.status_code == 200
+    assert r.json()["status"] == "approved"
 
 
 def test_us_309_1(client):
@@ -747,12 +770,16 @@ def test_us_309_1(client):
         },
     )
     assert r.status_code == 200
+    assert r.json()["success"] is True
 
 
 def test_us_309_2(client):
     """采购方查看/审批装箱批次明细"""
     r = client.get(f"/logistics/shipment-notes/{ST.shipment_note_id}/packing-lists")
     assert r.status_code == 200
+    rows = r.json()
+    assert isinstance(rows, list)
+    assert len(rows) >= 1
 
 
 def test_us_310_1(client):
@@ -777,12 +804,15 @@ def test_us_310_1(client):
         },
     )
     assert r.status_code == 200
+    assert r.json()["status"] == "qualified"
+    ST.matrix_receipt_id = r.json()["id"]
 
 
 def test_us_310_2(client):
     """供应商查看收货结果"""
     r = client.get("/logistics/receipts/", params={"supplier_id": 1})
     assert r.status_code == 200
+    assert any(x["id"] == ST.matrix_receipt_id for x in r.json())
 
 
 # --- Phase 4: 财务 ---

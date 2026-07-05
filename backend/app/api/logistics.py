@@ -1,5 +1,5 @@
 """物流与入库管理 API - ASN/运单/入库"""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, or_
 from sqlalchemy.orm import selectinload
@@ -8,7 +8,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.models.supply_chain import ASN, ShipmentNote, ShipmentNoteItem, Receipt, ReceiptItem, Warehouse, PurchaseOrder
+from app.models.supply_chain import ASN, ShipmentNote, ShipmentNoteItem, Receipt, ReceiptItem, Warehouse, PurchaseOrder, ShipmentStatus
 
 router = APIRouter(prefix="/logistics", tags=["物流与入库"])
 
@@ -58,6 +58,15 @@ class ReceiptCreate(BaseModel):
     purchase_order_id: Optional[int] = None
     remarks: Optional[str] = None
     items: List[dict] = []  # [{material_id, material_name, quantity, unit, batch_no, quality_result}]
+
+
+class ShipmentApproveIn(BaseModel):
+    approved: bool = True
+    reason: Optional[str] = None
+
+
+class PackingListIn(BaseModel):
+    items: List[dict] = []  # [{material_name, quantity, batch_no, production_date, package_count, notes}]
 
 
 class ReceiptResponse(BaseModel):
@@ -121,7 +130,7 @@ async def create_shipment_note(
         shipment_no=shipment_no,
         purchase_order_id=body.purchase_order_id,
         supplier_id=body.supplier_id,
-        status="submitted",
+        status=ShipmentStatus.DRAFT,
         carrier_name=body.carrier_name,
         tracking_no=body.tracking_no,
         vehicle_no=body.vehicle_no,
@@ -140,9 +149,11 @@ async def create_shipment_note(
     for item_data in body.items:
         item = ShipmentNoteItem(
             shipment_note_id=note.id,
+            material_id=item_data.get("material_id") or 1,
             material_name=item_data.get("material_name", ""),
             quantity=item_data.get("quantity", 0),
             unit=item_data.get("unit", "吨"),
+            batch_no=item_data.get("batch_no"),
         )
         db.add(item)
 
@@ -214,8 +225,171 @@ async def confirm_arrival(
     note.status = "arrived"
     note.actual_arrival = datetime.utcnow()
     await db.commit()
-    
+
     return {"success": True, "message": "已确认到货"}
+
+
+@router.post("/shipment-notes/{note_id}/submit")
+async def submit_shipment_note(
+    note_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """US-307/308：供应商提交送货计划"""
+    result = await db.execute(
+        select(ShipmentNote).where(ShipmentNote.id == note_id)
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="运单不存在")
+
+    current = note.status.value if hasattr(note.status, "value") else str(note.status)
+    if current == ShipmentStatus.SUBMITTED.value:
+        return {"success": True, "message": "送货计划已提交", "status": current}
+    if current not in (ShipmentStatus.DRAFT.value, ShipmentStatus.REJECTED.value):
+        raise HTTPException(status_code=400, detail=f"当前状态 {current} 不可提交")
+
+    note.status = ShipmentStatus.SUBMITTED
+    await db.commit()
+    return {"success": True, "message": "送货计划已提交", "status": ShipmentStatus.SUBMITTED.value}
+
+
+# ==================== US-308: 采购方确认/拒绝送货计划 ====================
+
+@router.post("/shipment-notes/{note_id}/approve")
+async def approve_shipment_note(
+    note_id: int,
+    body: ShipmentApproveIn = Body(default_factory=ShipmentApproveIn),
+    db: AsyncSession = Depends(get_db)
+):
+    """US-308-1：采购方批准或拒绝送货计划"""
+    result = await db.execute(
+        select(ShipmentNote).where(ShipmentNote.id == note_id)
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="运单不存在")
+
+    if body.approved:
+        note.status = ShipmentStatus.APPROVED
+        msg = "送货计划已批准"
+    else:
+        note.status = ShipmentStatus.REJECTED
+        note.notes = (note.notes or "") + f"\n[拒绝原因] {body.reason or '未提供'}"
+        msg = "送货计划已拒绝"
+
+    await db.commit()
+    return {"success": True, "message": msg, "status": note.status.value if hasattr(note.status, "value") else str(note.status)}
+
+
+@router.post("/shipment-notes/{note_id}/reject")
+async def reject_shipment_note(
+    note_id: int,
+    reason: str = Query("采购方拒绝"),
+    db: AsyncSession = Depends(get_db)
+):
+    """US-308-1：采购方拒绝送货计划（快捷入口）"""
+    return await approve_shipment_note(
+        note_id,
+        ShipmentApproveIn(approved=False, reason=reason),
+        db,
+    )
+
+
+# ==================== US-309: 装箱单与批次信息 ====================
+
+@router.post("/shipment-notes/{note_id}/packing-list")
+async def submit_packing_list(
+    note_id: int,
+    body: PackingListIn,
+    db: AsyncSession = Depends(get_db)
+):
+    """US-309-1：供应商提交装箱单与批次信息"""
+    result = await db.execute(
+        select(ShipmentNote).options(selectinload(ShipmentNote.items)).where(ShipmentNote.id == note_id)
+    )
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="运单不存在")
+
+    # 更新运单明细的批次和装箱信息
+    existing = {item.id: item for item in note.items}
+    for packing_item in body.items:
+        item_id = packing_item.get("id")
+        if item_id and item_id in existing:
+            item = existing[item_id]
+            item.batch_no = packing_item.get("batch_no", item.batch_no)
+            item.production_date = packing_item.get("production_date", item.production_date)
+            item.package_count = packing_item.get("package_count", item.package_count)
+            item.notes = packing_item.get("notes", item.notes)
+        else:
+            prod = packing_item.get("production_date")
+            prod_dt = None
+            if prod:
+                try:
+                    prod_dt = datetime.fromisoformat(str(prod).replace("Z", ""))
+                except ValueError:
+                    prod_dt = None
+            new_item = ShipmentNoteItem(
+                shipment_note_id=note.id,
+                material_id=packing_item.get("material_id") or 1,
+                material_name=packing_item.get("material_name", ""),
+                quantity=packing_item.get("quantity", 0),
+                unit=packing_item.get("unit", "吨"),
+                batch_no=packing_item.get("batch_no", ""),
+                production_date=prod_dt,
+                package_count=packing_item.get("package_count", 1),
+                notes=packing_item.get("notes", ""),
+            )
+            db.add(new_item)
+
+    await db.commit()
+    return {"success": True, "message": "装箱单与批次信息已提交"}
+
+
+@router.post("/shipment-notes/{note_id}/packing-lists")
+async def submit_packing_lists(
+    note_id: int,
+    body: PackingListIn,
+    db: AsyncSession = Depends(get_db)
+):
+    """US-309-1：烟测路径别名（复数 packing-lists）"""
+    return await submit_packing_list(note_id, body, db)
+
+
+@router.get("/shipment-notes/{note_id}/packing-list")
+async def get_packing_list(
+    note_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """US-309-2：查看装箱单与批次信息"""
+    result = await db.execute(
+        select(ShipmentNoteItem).where(ShipmentNoteItem.shipment_note_id == note_id)
+    )
+    items = result.scalars().all()
+    return [
+        {
+            "id": item.id,
+            "material_name": item.material_name,
+            "quantity": item.quantity,
+            "unit": item.unit,
+            "batch_no": item.batch_no,
+            "production_date": item.production_date.isoformat() if item.production_date else None,
+            "origin_location": item.origin_location,
+            "quality_grade": item.quality_grade,
+            "package_count": item.package_count,
+            "notes": item.notes,
+        }
+        for item in items
+    ]
+
+
+@router.get("/shipment-notes/{note_id}/packing-lists")
+async def get_packing_lists(
+    note_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """US-309-2：烟测路径别名（复数 packing-lists）"""
+    return await get_packing_list(note_id, db)
 
 
 # ==================== 入库单接口 ====================
@@ -386,7 +560,7 @@ def _format_shipment_note(note: ShipmentNote) -> dict:
         "purchase_order_id": note.purchase_order_id,
         "supplier_id": note.supplier_id,
         "supplier_name": note.supplier.name if note.supplier else None,
-        "status": note.status,
+        "status": note.status.value if hasattr(note.status, "value") else str(note.status),
         "carrier_name": note.carrier_name,
         "tracking_no": note.tracking_no,
         "vehicle_no": note.vehicle_no,

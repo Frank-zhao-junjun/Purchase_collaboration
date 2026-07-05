@@ -1,4 +1,4 @@
-"""白酒供应链数据模型"""
+"""采购供应链协同数据模型"""
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
@@ -169,6 +169,8 @@ class Warehouse(Base):
 class ShipmentStatus(str, enum.Enum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     IN_TRANSIT = "in_transit"
     ARRIVED = "arrived"
     RECEIVED = "received"

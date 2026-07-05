@@ -107,7 +107,7 @@ async def list_forecasts(
         desc(PurchaseForecast.created_at)
     )
     if status:
-        q = q.where(PurchaseForecast.status == status)
+        q = q.where(PurchaseForecast.status == ForecastStatus(status))
     if supplier_id is not None:
         q = q.where(PurchaseForecast.supplier_id == supplier_id)
     rows = (await db.execute(q)).scalars().all()
