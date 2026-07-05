@@ -345,6 +345,16 @@ def test_us_106_1(client):
         },
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["final_score"]  # 加权综合分应存在
+    assert 0 < body["final_score"] <= 100
+    # 验证评分已持久化
+    detail = client.get(f"/qualification/projects/{ST.qual_project_id}/submissions/1").json()
+    assert detail["tech_score"] == 80
+    assert detail["quality_score"] == 85
+    assert detail["finance_score"] == 82
+    assert detail["final_score"] is not None
 
 
 def test_us_106_2(client):
@@ -354,6 +364,10 @@ def test_us_106_2(client):
         params={"supplier_id": 1},
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["status"] in ("in_progress", "approved", "rejected")
+    assert "final_score" in body
+    assert body["has_final_result"] in (True, False)
 
 
 def test_us_107_1(client):
@@ -363,6 +377,14 @@ def test_us_107_1(client):
         params={"supplier_id": 1, "opinion": "US-107-1"},
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    # 验证供应商状态已变为 active
+    supplier = client.get("/suppliers/1").json()
+    assert supplier["status"] in ("active", "ACTIVE")
+    # 验证项目状态已更新
+    project = client.get(f"/qualification/projects/{ST.qual_project_id}").json()
+    assert project["status"] in ("approved", "APPROVED")
 
 
 def test_us_107_2(client):
@@ -372,39 +394,69 @@ def test_us_107_2(client):
         params={"supplier_id": 1},
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["has_final_result"] is True
+    assert body["status"] == "approved"
 
 
 def test_us_108_1(client):
     """采购方资质预警列表"""
+    # 先触发一次资质检查
+    client.post("/supplier-portal/cert-alerts/check")
     r = client.get("/supplier-portal/supplier-alerts")
     assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, list)
+    # 确认预警记录存在
+    alert_ids = [a["id"] for a in body] if body else []
+    if alert_ids:
+        ST.alert_id = alert_ids[0]
 
 
 def test_us_108_2(client):
     """供应商端资质/预警查看"""
     r = client.get("/supplier-portal/suppliers/1/certifications")
     assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, list)
+    # 种子数据中供应商 1 至少存在一张资质证书
+    assert body
+    assert all("cert_no" in c for c in body)
 
 
 def test_us_109_1(client):
     """供应商提交/更新资质证书"""
     exp = (datetime.utcnow() + timedelta(days=365)).isoformat()
+    cert_no = f"CN-US109-{_suffix()}"
     r = client.post(
         "/supplier-portal/suppliers/1/certifications",
         json={
             "cert_type": "生产许可证",
             "cert_name": "US-109-1 测试证",
-            "cert_no": f"CN-US109-{_suffix()}",
+            "cert_no": cert_no,
             "expiry_date": exp,
         },
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body.get("success", True)  # 兼容 {success: true} 和直接返回对象
+    ST.cert_no = cert_no
+    # 验证证书已在列表中
+    certs = client.get("/supplier-portal/suppliers/1/certifications").json()
+    assert any(c.get("cert_no") == cert_no for c in certs)
 
 
 def test_us_109_2(client):
     """采购方查看供应商资质"""
     r = client.get("/supplier-portal/suppliers/1/certifications")
     assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, list)
+    assert len(body) >= 1
+    # 确认 US-109-1 的证书存在
+    match = next((c for c in body if c.get("cert_no") == getattr(ST, "cert_no", "")), None)
+    assert match is not None, f"证书 {getattr(ST, 'cert_no', 'unknown')} 未在列表中找到"
+    assert match.get("cert_type") == "生产许可证"
 
 
 # --- Phase 2: 寻源与合同 ---

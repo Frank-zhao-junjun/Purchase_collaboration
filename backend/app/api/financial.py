@@ -1,5 +1,6 @@
 """财务管理 API - 结算单/发票/付款"""
 import json
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, or_
@@ -452,7 +453,7 @@ async def create_invoice(
     db: AsyncSession = Depends(get_db)
 ):
     """创建发票"""
-    invoice_no = data.invoice_no or f"INV{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    invoice_no = data.invoice_no or f"INV{datetime.now().strftime('%Y%m%d%H%M%S%f')}{uuid.uuid4().hex[:4].upper()}"
     
     invoice = Invoice(
         invoice_no=invoice_no,
@@ -505,10 +506,10 @@ async def three_way_match(
             except json.JSONDecodeError:
                 receipt_ids = []
             if receipt_ids:
-                rcpt_result = await db.execute(
+                receipt_count = await db.scalar(
                     select(func.count()).select_from(Receipt).where(Receipt.id.in_(receipt_ids))
-                )
-                receipt_amount = float(rcpt_result.scalar() or 0) * 1000.0 if rcpt_result.scalar() else statement_amount
+                ) or 0
+                receipt_amount = float(receipt_count) * 1000.0 if receipt_count else statement_amount
             else:
                 receipt_amount = statement_amount
 

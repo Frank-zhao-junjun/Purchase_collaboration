@@ -210,6 +210,8 @@ async def supplier_view_invitations(
             "project_name": inv.sourcing.project_name if inv.sourcing else None,
             "sourcing_type": inv.sourcing.sourcing_type if inv.sourcing else None,
             "status": inv.status,
+            "project_status": inv.sourcing.status.value if inv.sourcing else None,
+            "budget": inv.sourcing.budget if inv.sourcing else None,
             "deadline": inv.sourcing.deadline if inv.sourcing else None,
             "responded_at": inv.responded_at,
             "decline_reason": inv.decline_reason,
@@ -1101,9 +1103,10 @@ async def get_sign_status(
     contract = result.scalar_one_or_none()
     if not contract:
         raise HTTPException(status_code=404, detail="合同不存在")
+    status = contract.status.value if hasattr(contract.status, "value") else str(contract.status)
     return {
         "contract_id": contract.id,
-        "status": contract.status.value,
+        "status": status,
         "supplier_signed": bool(contract.supplier_signed),
         "supplier_signed_at": contract.supplier_signed_at,
         "buyer_signed": bool(contract.buyer_signed),
