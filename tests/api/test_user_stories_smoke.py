@@ -805,7 +805,11 @@ def test_us_401_1(client):
         },
     )
     assert r.status_code == 200
-    ST.matrix_statement_id = r.json()["id"]
+    body = r.json()
+    assert body["id"]
+    assert body["status"] == "pending_audit"
+    assert body["total_amount"] == 2000.0
+    ST.matrix_statement_id = body["id"]
 
 
 def test_us_401_2(client):
@@ -815,6 +819,11 @@ def test_us_401_2(client):
         json={"action": "approve", "auditor": "pytest", "message": "US-401-2"},
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["status"] == "confirmed"
+    detail = client.get(f"/financial/statements/{ST.matrix_statement_id}").json()
+    assert detail["status"] == "confirmed"
 
 
 def test_us_402_1(client):
@@ -832,6 +841,9 @@ def test_us_402_1(client):
         },
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "pending_audit"
+    assert "US-402-1" in (body.get("remarks") or "")
 
 
 def test_us_402_2(client):
@@ -841,6 +853,7 @@ def test_us_402_2(client):
         json={"action": "approve", "auditor": "pytest", "message": "US-402-2"},
     )
     assert r.status_code == 200
+    assert r.json()["status"] == "confirmed"
 
 
 def test_us_403_1(client):
@@ -856,17 +869,22 @@ def test_us_403_1(client):
         },
     )
     assert r.status_code == 200
-    ST.matrix_invoice_id = r.json()["id"]
+    body = r.json()
+    assert body["id"]
+    assert body["statement_id"] == ST.matrix_statement_id
+    ST.matrix_invoice_id = body["id"]
 
 
 def test_us_403_2(client):
     """三单匹配 + 发票审批"""
-    client.get(f"/financial/invoices/{ST.matrix_invoice_id}/three-way-match")
+    match = client.get(f"/financial/invoices/{ST.matrix_invoice_id}/three-way-match").json()
+    assert match["matched"] is True
     r = client.post(
         f"/financial/invoices/{ST.matrix_invoice_id}/approve",
         params={"auditor": "财务"},
     )
     assert r.status_code == 200
+    assert r.json()["status"] == "verified"
 
 
 def test_us_404_1(client):
@@ -880,10 +898,12 @@ def test_us_404_1(client):
             "tax_amount": 13.0,
         },
     ).json()["id"]
-    client.post(
+    reject = client.post(
         f"/financial/invoices/{inv_new}/reject",
         params={"reason": "US-404-1"},
     )
+    assert reject.status_code == 200
+    assert reject.json()["status"] == "rejected"
     r = client.post(
         f"/financial/invoices/{inv_new}/resubmit",
         json={
@@ -894,6 +914,9 @@ def test_us_404_1(client):
         },
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["amount"] == 120.0
+    assert body["status"] == "issued"
     ST.resubmit_invoice_id = inv_new
 
 
@@ -901,6 +924,10 @@ def test_us_404_2(client):
     """采购方查看重提后的发票"""
     r = client.get(f"/financial/invoices/{ST.resubmit_invoice_id}")
     assert r.status_code == 200
+    body = r.json()
+    assert body["amount"] == 120.0
+    assert body["tax_amount"] == 15.6
+    assert body["status"] == "issued"
 
 
 def test_us_405_1(client):
@@ -915,13 +942,19 @@ def test_us_405_1(client):
         },
     )
     assert r.status_code == 200
-    ST.matrix_payment_id = r.json()["id"]
+    body = r.json()
+    assert body["id"]
+    assert body["status"] == "applied"
+    ST.matrix_payment_id = body["id"]
 
 
 def test_us_405_2(client):
     """供应商查询付款"""
     r = client.get("/financial/payments/", params={"supplier_id": 1})
     assert r.status_code == 200
+    rows = r.json()
+    assert isinstance(rows, list)
+    assert any(p["id"] == ST.matrix_payment_id for p in rows)
 
 
 # --- US-501 公告 ---

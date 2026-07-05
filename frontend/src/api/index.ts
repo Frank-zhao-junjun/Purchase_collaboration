@@ -197,6 +197,16 @@ export const getContractTemplates = () => api.get('/contracts/templates')
 export const generateContractFromSourcing = (sourcingId: number, templateId: number, supplierId: number, contractName: string) =>
   api.post(`/contracts/generate-from-sourcing/${sourcingId}?template_id=${templateId}&supplier_id=${supplierId}&contract_name=${encodeURIComponent(contractName)}`)
 
+// 合同协同
+export const acknowledgeContractDraft = (contractId: number) =>
+  api.post(`/contracts/drafts/${contractId}/acknowledge`)
+
+export const addContractFeedback = (contractId: number, clauseId: string, party: string, comment: string) =>
+  api.post(`/contracts/${contractId}/feedback?clause_id=${encodeURIComponent(clauseId)}&party=${party}&comment=${encodeURIComponent(comment)}`)
+
+export const getContractFeedbackItems = (contractId: number) =>
+  api.get(`/contracts/${contractId}/feedback-items`)
+
 // 供应商端 - 邀请
 export const getSupplierInvitations = (supplierId: number) =>
   api.get('/sourcing/projects/invitations', { params: { supplier_id: supplierId } })
@@ -428,8 +438,26 @@ export const createStatement = (data: {
   period_start: string
   period_end: string
   total_amount: number
+  receipt_ids?: number[]
+  settlement_period?: string
   remarks?: string
-}) => api.post('/financial/statements/', data)
+}, submit = false) => api.post('/financial/statements/', data, { params: submit ? { submit: 'true' } : {} })
+
+export const updateStatement = (id: number, data: {
+  supplier_id: number
+  period_start: string
+  period_end: string
+  total_amount: number
+  receipt_ids?: number[]
+  settlement_period?: string
+  remarks?: string
+}, submit = false) => api.put(`/financial/statements/${id}`, data, { params: submit ? { submit: 'true' } : {} })
+
+export const buyerAuditStatement = (id: number, data: {
+  action: 'approve' | 'reject'
+  auditor?: string
+  message?: string
+}) => api.post(`/financial/statements/${id}/buyer-audit`, data)
 
 export const confirmStatement = (id: number, confirmed_by?: string) =>
   api.post(`/financial/statements/${id}/confirm?confirmed_by=${confirmed_by || ''}`)
@@ -570,11 +598,20 @@ export const addStatementComment = (id: number, data: { comment: string; author:
 
 // US-404: 三单匹配与发票审批
 export const threeWayMatch = (invoiceId: number) =>
-  api.get(`/financial/invoices/${invoiceId}/three-way-match`).catch(() => ({ matched: false }))
+  api.get(`/financial/invoices/${invoiceId}/three-way-match`)
 
 export const approveInvoice = (id: number) =>
   api.post(`/financial/invoices/${id}/approve`)
 
 export const rejectInvoice = (id: number, reason: string) =>
   api.post(`/financial/invoices/${id}/reject?reason=${encodeURIComponent(reason)}`)
+
+export const resubmitInvoice = (id: number, data: {
+  supplier_id: number
+  statement_id?: number
+  amount: number
+  tax_amount: number
+  remarks?: string
+  invoice_image_url?: string
+}) => api.post(`/financial/invoices/${id}/resubmit`, data)
 
