@@ -999,17 +999,31 @@ def test_us_501_1(client):
             "content": "矩阵测试",
             "announcement_type": "announcement",
             "published_by": "pytest",
+            "priority": 1,
+            "is_pinned": True,
         },
     )
     assert r.status_code == 200
-    ST.announcement_id = r.json()["id"]
+    body = r.json()
+    assert body["title"] == "US-501-1 公告"
+    assert body["announcement_type"] == "announcement"
+    assert body["published_by"] == "pytest"
+    assert body["is_pinned"] is True
+    ST.announcement_id = body["id"]
+    listed = client.get("/announcements/", params={"announcement_type": "announcement"}).json()
+    assert any(item["id"] == ST.announcement_id for item in listed["items"])
 
 
 def test_us_501_2(client):
     """查看公告并记录已读"""
-    client.get(f"/announcements/{ST.announcement_id}")
+    detail = client.get(f"/announcements/{ST.announcement_id}").json()
+    assert detail["title"] == "US-501-1 公告"
+    assert detail["view_count"] >= 1
     r = client.post(
         f"/announcements/{ST.announcement_id}/record-read",
         params={"user_id": 1},
     )
     assert r.status_code == 200
+    assert r.json()["success"] is True
+    summary = client.get("/announcements/types/summary").json()
+    assert any(row["type"] == "announcement" and row["count"] >= 1 for row in summary)

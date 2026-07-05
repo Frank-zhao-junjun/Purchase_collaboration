@@ -8,7 +8,7 @@ import {
   PushpinOutlined,
   EyeOutlined 
 } from '@ant-design/icons'
-import { getAnnouncements, recordAnnouncementRead, getAnnouncementTypesSummary, AnnouncementItem } from '../../api'
+import { getAnnouncements, getAnnouncement, recordAnnouncementRead, getAnnouncementTypesSummary, AnnouncementItem } from '../../api'
 
 const { Text, Title } = Typography
 
@@ -76,14 +76,15 @@ const SupplierAnnouncementList: React.FC = () => {
 
   // 查看详情
   const handleViewDetail = async (item: AnnouncementItem) => {
-    setSelectedItem(item)
-    setDetailVisible(true)
-    
-    // 记录阅读（不阻塞显示）
     try {
+      const detail = await getAnnouncement(item.id)
+      setSelectedItem(detail)
+      setDetailVisible(true)
       await recordAnnouncementRead(item.id, CURRENT_SUPPLIER_ID)
     } catch (err) {
-      console.error('记录阅读失败', err)
+      console.error('加载公告失败', err)
+      setSelectedItem(item)
+      setDetailVisible(true)
     }
   }
 
@@ -162,7 +163,7 @@ const SupplierAnnouncementList: React.FC = () => {
         title={
           <Space>
             <ReadOutlined />
-            <span>公告通知</span>
+            <span>公告通知 (US-501-2)</span>
           </Space>
         }
         styles={{ body: { padding: 0 } }}

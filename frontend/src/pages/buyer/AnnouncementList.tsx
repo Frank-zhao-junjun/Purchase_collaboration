@@ -204,7 +204,7 @@ const BuyerAnnouncementList: React.FC = () => {
 
   return (
     <Card
-      title="公告管理"
+      title="公告管理 (US-501-1)"
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
           发布公告

@@ -181,6 +181,33 @@ async def list_announcements(
     }
 
 
+@router.get("/types/summary")
+async def get_announcement_types_summary(
+    db: AsyncSession = Depends(get_db)
+):
+    """获取各类型公告数量统计"""
+    now = datetime.utcnow()
+    results = []
+
+    for ann_type in AnnouncementType:
+        query = select(func.count()).select_from(Announcement).where(
+            Announcement.announcement_type == ann_type,
+            or_(
+                Announcement.valid_until.is_(None),
+                Announcement.valid_until >= now
+            )
+        )
+        result = await db.execute(query)
+        count = result.scalar()
+        results.append({
+            "type": ann_type.value,
+            "label": _get_type_label(ann_type.value),
+            "count": count
+        })
+
+    return results
+
+
 @router.get("/{announcement_id}", response_model=AnnouncementResponse)
 async def get_announcement(
     announcement_id: int,
@@ -232,33 +259,6 @@ async def record_announcement_read(
         await db.commit()
     
     return {"success": True, "message": "已记录阅读"}
-
-
-@router.get("/types/summary")
-async def get_announcement_types_summary(
-    db: AsyncSession = Depends(get_db)
-):
-    """获取各类型公告数量统计"""
-    now = datetime.utcnow()
-    results = []
-    
-    for ann_type in AnnouncementType:
-        query = select(func.count()).select_from(Announcement).where(
-            Announcement.announcement_type == ann_type,
-            or_(
-                Announcement.valid_until.is_(None),
-                Announcement.valid_until >= now
-            )
-        )
-        result = await db.execute(query)
-        count = result.scalar()
-        results.append({
-            "type": ann_type.value,
-            "label": _get_type_label(ann_type.value),
-            "count": count
-        })
-    
-    return results
 
 
 # ==================== 辅助函数 ====================
