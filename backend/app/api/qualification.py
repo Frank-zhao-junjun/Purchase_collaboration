@@ -123,9 +123,10 @@ async def create_qualification_project(
 @router.get("/projects")
 async def list_qualification_projects(
     status: str = Query(None),
+    supplier_id: int = Query(None, description="供应商端：仅查看被邀请参与的评审项目 (US-104-2)"),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取资格评审项目列表"""
+    """获取资格评审项目列表；采购方看全部，供应商传 supplier_id 过滤"""
     query = select(QualificationProject).order_by(QualificationProject.created_at.desc())
     if status:
         query = query.where(QualificationProject.status == status)
@@ -134,24 +135,38 @@ async def list_qualification_projects(
 
     response = []
     for p in projects:
-        # 获取邀请供应商数量
         sub_count_result = await db.execute(
             select(QualificationSubmission)
             .where(QualificationSubmission.project_id == p.id)
         )
         submissions = sub_count_result.scalars().all()
+
+        my_submission = None
+        if supplier_id is not None:
+            my_submission = next(
+                (s for s in submissions if s.supplier_id == supplier_id),
+                None,
+            )
+            if not my_submission:
+                continue
+
         accepted = sum(1 for s in submissions if s.status != QualificationStatus.PENDING_RESPONSE)
-        response.append({
+        item = {
             "id": p.id,
             "project_name": p.project_name,
             "target_categories": p.target_categories,
             "deadline": p.deadline,
             "status": p.status.value,
+            "notes": p.notes,
             "created_at": p.created_at,
             "completed_at": p.completed_at,
             "invited_count": len(submissions),
-            "accepted_count": accepted
-        })
+            "accepted_count": accepted,
+        }
+        if my_submission:
+            item["my_status"] = my_submission.status.value
+            item["submission_id"] = my_submission.id
+        response.append(item)
     return response
 
 

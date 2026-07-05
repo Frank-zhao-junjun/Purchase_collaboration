@@ -229,10 +229,11 @@ def test_us_103_2(client):
 def test_us_104_1(client):
     """资格评审项目创建（采购方）"""
     s = _suffix()
+    project_name = f"资格评审{s}"
     r = client.post(
         "/qualification/projects",
         json={
-            "project_name": f"资格评审{s}",
+            "project_name": project_name,
             "target_categories": "原料",
             "target_supplier_ids": [1],
             "deadline": (datetime.utcnow() + timedelta(days=30)).isoformat(),
@@ -240,13 +241,33 @@ def test_us_104_1(client):
         },
     )
     assert r.status_code == 200
-    ST.qual_project_id = r.json()["id"]
+    body = r.json()
+    ST.qual_project_id = body["id"]
+    ST.qual_project_name = project_name
+    assert body["project_name"] == project_name
+    assert body["target_categories"] == "原料"
+    assert body["status"] == "pending_response"
+    assert body["notes"] == "US-104-1"
+    assert len(body["invited_suppliers"]) == 1
+    assert body["invited_suppliers"][0]["supplier_id"] == 1
+    assert body["invited_suppliers"][0]["status"] == "pending_response"
 
 
 def test_us_104_2(client):
     """供应商查看资格评审项目"""
-    r = client.get("/qualification/projects")
+    r = client.get("/qualification/projects", params={"supplier_id": 1})
     assert r.status_code == 200
+    rows = r.json()
+    assert isinstance(rows, list)
+    assert any(p["id"] == ST.qual_project_id for p in rows)
+    match = next(p for p in rows if p["id"] == ST.qual_project_id)
+    assert match["project_name"] == ST.qual_project_name
+    assert match["target_categories"] == "原料"
+    assert match["notes"] == "US-104-1"
+    assert match["my_status"] == "pending_response"
+    detail = client.get(f"/qualification/projects/{ST.qual_project_id}").json()
+    assert detail["project_name"] == ST.qual_project_name
+    assert any(inv["supplier_id"] == 1 for inv in detail["invited_suppliers"])
 
 
 def test_us_105_1(client):

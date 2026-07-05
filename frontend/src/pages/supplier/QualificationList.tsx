@@ -1,22 +1,32 @@
 import React, { useEffect, useState } from 'react'
 import { Table, Tag, Button, Modal, Form, Input, Select, Card, Space, message, Descriptions, Collapse, InputNumber } from 'antd'
-import { FileTextOutlined, UploadOutlined } from '@ant-design/icons'
-import { getQualificationProjects, getQuestionnaire, submitQualification } from '../../api'
+import { FileTextOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
+import { getQualificationProjects, getQualificationProject, getQuestionnaire, submitQualification } from '../../api'
 
-const SUPPLIER_ID = 1 // Demo supplier ID
+const SUPPLIER_ID = 1
+
+const projectStatusMap: Record<string, { color: string; text: string }> = {
+  pending_response: { color: 'blue', text: '待响应' },
+  in_progress: { color: 'orange', text: '评审中' },
+  supplement_materials: { color: 'gold', text: '待补充材料' },
+  approved: { color: 'green', text: '已通过' },
+  rejected: { color: 'red', text: '已驳回' },
+}
 
 const SupplierQualification: React.FC = () => {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [fillOpen, setFillOpen] = useState(false)
+  const [viewOpen, setViewOpen] = useState(false)
   const [currentProject, setCurrentProject] = useState<any>(null)
+  const [viewDetail, setViewDetail] = useState<any>(null)
   const [questionnaire, setQuestionnaire] = useState<any>(null)
   const [form] = Form.useForm()
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const res = await getQualificationProjects() as any
+      const res = await getQualificationProjects({ supplier_id: SUPPLIER_ID }) as any
       setData(Array.isArray(res) ? res : [])
     } catch { setData([]) }
     setLoading(false)
@@ -24,12 +34,19 @@ const SupplierQualification: React.FC = () => {
 
   useEffect(() => { fetchData() }, [])
 
+  const handleView = async (project: any) => {
+    try {
+      const detail = await getQualificationProject(project.id) as any
+      setViewDetail(detail)
+      setViewOpen(true)
+    } catch { message.error('获取项目详情失败') }
+  }
+
   const handleFill = async (project: any) => {
     setCurrentProject(project)
     try {
       const q = await getQuestionnaire(project.id, { params: { supplier_id: SUPPLIER_ID } }) as any
       setQuestionnaire(q)
-      // Flatten sections/fields into form values
       const initialValues: Record<string, string> = {}
       if (q?.sections && Array.isArray(q.sections)) {
         q.sections.forEach((section: any) => {
@@ -43,7 +60,6 @@ const SupplierQualification: React.FC = () => {
       form.setFieldsValue(initialValues)
       setFillOpen(true)
     } catch {
-      // If questionnaire fetch fails, show generic form
       setQuestionnaire(null)
       setFillOpen(true)
     }
@@ -67,33 +83,25 @@ const SupplierQualification: React.FC = () => {
     }
   }
 
-  const statusMap: Record<string, { color: string; text: string }> = {
-    pending_response: { color: 'blue', text: '待填写' },
-    in_progress: { color: 'orange', text: '评审中' },
-    supplement_materials: { color: 'gold', text: '待补充材料' },
-    approved: { color: 'green', text: '已通过' },
-    rejected: { color: 'red', text: '已驳回' },
-  }
-
   const columns = [
     { title: '项目名称', dataIndex: 'project_name', key: 'project_name' },
     { title: '品类范围', dataIndex: 'target_categories', key: 'target_categories', ellipsis: true },
-    { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => {
-      const s = statusMap[v] || { color: 'default', text: v }
+    { title: '我的状态', dataIndex: 'my_status', key: 'my_status', render: (v: string, r: any) => {
+      const key = v || r.status
+      const s = projectStatusMap[key] || { color: 'default', text: key }
       return <Tag color={s.color}>{s.text}</Tag>
     }},
     { title: '截止日期', dataIndex: 'deadline', key: 'deadline', render: (v: string) => v ? new Date(v).toLocaleDateString() : '-' },
-    { title: '受邀/已提交', key: 'counts', render: (_: any, r: any) => `${r.invited_count || 0} / ${r.accepted_count || 0}` },
     { title: '操作', key: 'action', render: (_: any, r: any) => (
       <Space>
-        {(r.status === 'pending_response' || r.status === 'supplement_materials') && (
+        <Button type="link" icon={<EyeOutlined />} size="small" onClick={() => handleView(r)}>查看</Button>
+        {(r.my_status === 'pending_response' || r.my_status === 'supplement_materials') && (
           <Button type="primary" icon={<FileTextOutlined />} size="small" onClick={() => handleFill(r)}>填写问卷</Button>
         )}
       </Space>
     )},
   ]
 
-  // Render a field based on its type from the questionnaire definition
   const renderField = (field: any) => {
     if (field.type === 'select') {
       return (
@@ -125,12 +133,26 @@ const SupplierQualification: React.FC = () => {
 
   return (
     <div>
-      <Card title="资格评审 (US-105~107)">
+      <Card title="资格评审项目 (US-104-2)">
         <Table rowKey="id" dataSource={data} columns={columns} loading={loading} pagination={{ pageSize: 10 }} />
       </Card>
 
+      <Modal title="评审项目详情 (US-104-2)" open={viewOpen} onCancel={() => setViewOpen(false)} footer={null} width={640}>
+        {viewDetail && (
+          <Descriptions bordered column={1} size="small">
+            <Descriptions.Item label="项目名称">{viewDetail.project_name}</Descriptions.Item>
+            <Descriptions.Item label="评审品类">{viewDetail.target_categories || '-'}</Descriptions.Item>
+            <Descriptions.Item label="截止日期">{viewDetail.deadline ? new Date(viewDetail.deadline).toLocaleDateString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="项目状态">
+              <Tag color={projectStatusMap[viewDetail.status]?.color}>{projectStatusMap[viewDetail.status]?.text || viewDetail.status}</Tag>
+            </Descriptions.Item>
+            {viewDetail.notes && <Descriptions.Item label="评审要求">{viewDetail.notes}</Descriptions.Item>}
+          </Descriptions>
+        )}
+      </Modal>
+
       <Modal
-        title={`填写资格问卷 - ${currentProject?.project_name || ''}`}
+        title={`填写资格问卷 (US-105) - ${currentProject?.project_name || ''}`}
         open={fillOpen}
         onOk={handleSubmit}
         onCancel={() => { setFillOpen(false); form.resetFields() }}
@@ -171,9 +193,6 @@ const SupplierQualification: React.FC = () => {
               </Form.Item>
               <Form.Item name="production_capacity" label="年产能（吨）" rules={[{ required: true }]}>
                 <Input type="number" placeholder="年产能" />
-              </Form.Item>
-              <Form.Item name="delivery_capability" label="供货能力说明">
-                <Input.TextArea rows={2} placeholder="请描述供货能力" />
               </Form.Item>
             </>
           )}

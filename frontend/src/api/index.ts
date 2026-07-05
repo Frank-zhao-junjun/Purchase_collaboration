@@ -108,11 +108,11 @@ export const createQualificationProject = (data: {
   project_name: string
   target_categories: string
   target_supplier_ids: number[]
-  description?: string
+  notes?: string
   deadline?: string
 }) => api.post('/qualification/projects', data)
 
-export const getQualificationProjects = (params?: { status?: string }) =>
+export const getQualificationProjects = (params?: { status?: string; supplier_id?: number }) =>
   api.get('/qualification/projects', { params })
 
 export const getQualificationProject = (id: number) =>
