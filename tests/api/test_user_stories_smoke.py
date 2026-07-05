@@ -66,24 +66,44 @@ def test_us_101_1(client):
         },
     )
     assert r.status_code == 200
-    ST.invitation_code = r.json()["invitation_code"]
+    body = r.json()
+    ST.invitation_code = body["invitation_code"]
+    ST.invited_email = f"inv{s}@us-matrix.test"
+    assert body["status"] == "pending"
+    assert len(body["invitation_code"]) == 8
+    assert body["invited_email"] == ST.invited_email
+    assert body["invited_supplier_name"] == f"矩阵企业{s}"
+    assert body["expiry_date"]
+    assert body["notes"] == "US-101-1"
 
 
 def test_us_101_2(client):
     """查看注册邀请（供应商/列表）"""
-    r = client.get("/supplier-portal/invitations")
+    r = client.get(
+        "/supplier-portal/invitations",
+        params={"email": ST.invited_email},
+    )
     assert r.status_code == 200
+    rows = r.json()
+    assert isinstance(rows, list)
+    codes = [i["invitation_code"] for i in rows]
+    assert ST.invitation_code in codes
+    match = next(i for i in rows if i["invitation_code"] == ST.invitation_code)
+    assert match["invited_email"] == ST.invited_email
+    assert match["status"] == "pending"
 
 
 def test_us_102_1(client):
     """供应商自助注册"""
     s = _suffix()
+    company_name = f"注册公司{s}"
+    ucc = f"91110000{s.upper()}MA001"
     r = client.post(
         "/supplier-portal/register",
         json={
             "invitation_code": ST.invitation_code,
-            "company_name": f"注册公司{s}",
-            "unified_credit_code": f"91110000{s.upper()}MA001",
+            "company_name": company_name,
+            "unified_credit_code": ucc,
             "contact_person": "法人",
             "contact_phone": "13800000000",
             "contact_email": f"reg{s}@us-matrix.test",
@@ -93,13 +113,34 @@ def test_us_102_1(client):
         },
     )
     assert r.status_code == 200
-    ST.registration_id = r.json()["id"]
+    body = r.json()
+    ST.registration_id = body["id"]
+    ST.registration_company_name = company_name
+    ST.registration_ucc = ucc
+    assert body["status"] == "pending_audit"
+    assert body["company_name"] == company_name
+    assert body["unified_credit_code"] == ucc
+    assert body["contact_person"] == "法人"
+    inv_rows = client.get(
+        "/supplier-portal/invitations",
+        params={"email": ST.invited_email},
+    ).json()
+    inv = next(i for i in inv_rows if i["invitation_code"] == ST.invitation_code)
+    assert inv["status"] == "accepted"
 
 
 def test_us_102_2(client):
     """采购方查看供应商注册"""
     r = client.get(f"/supplier-portal/registrations/{ST.registration_id}")
     assert r.status_code == 200
+    body = r.json()
+    assert body["company_name"] == ST.registration_company_name
+    assert body["unified_credit_code"] == ST.registration_ucc
+    assert body["status"] == "pending_audit"
+    assert body["contact_person"] == "法人"
+    assert body["main_categories"] == "粮食"
+    assert body["annual_capacity"] == 100.0
+    assert body["invitation"]["invitation_code"] == ST.invitation_code
 
 
 def test_us_103_1(client):

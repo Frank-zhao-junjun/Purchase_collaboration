@@ -49,12 +49,13 @@ const buyerItems = [
 const supplierItems = [
   { key: '/supplier', icon: <DashboardOutlined />, label: '首页概览' },
   { type: 'group' as const, label: '供应商准入', children: [
+    { key: '/supplier/registration-invitations', icon: <SendOutlined />, label: '注册邀请' },
     { key: '/supplier/registration', icon: <FileProtectOutlined />, label: '自助注册' },
     { key: '/supplier/qualifications', icon: <SafetyCertificateOutlined />, label: '资格评审' },
     { key: '/supplier/certifications', icon: <AuditOutlined />, label: '资质管理' },
   ]},
   { type: 'group' as const, label: '寻源协同', children: [
-    { key: '/supplier/invitations', icon: <MessageOutlined />, label: '收到的邀请' },
+    { key: '/supplier/invitations', icon: <MessageOutlined />, label: '寻源邀请' },
     { key: '/supplier/bids', icon: <SwapOutlined />, label: '投标管理' },
   ]},
   { type: 'group' as const, label: '订单执行', children: [

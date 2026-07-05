@@ -166,10 +166,13 @@ async def validate_invitation_code(
 @router.get("/invitations")
 async def list_invitations(
     status: str = Query(None, description="筛选状态"),
+    email: str = Query(None, description="供应商端：按受邀邮箱筛选"),
     db: AsyncSession = Depends(get_db)
 ):
-    """采购方查看所有邀请记录"""
+    """采购方查看所有邀请；供应商端传 email 查看发给自己的注册邀请 (US-101-2)"""
     query = select(SupplierInvitation).order_by(SupplierInvitation.created_at.desc())
+    if email:
+        query = query.where(SupplierInvitation.invited_email == email.strip())
     if status:
         query = query.where(SupplierInvitation.status == status)
     result = await db.execute(query)
@@ -328,6 +331,7 @@ async def list_pending_audit(
             "annual_capacity": r.annual_capacity,
             "employee_count": r.employee_count,
             "established_year": r.established_year,
+            "status": r.status.value,
             "created_at": r.created_at
         }
         for r in registrations

@@ -3,6 +3,13 @@ import { Table, Tag, Button, Modal, Form, Input, Descriptions, Space, Card, mess
 import { CheckCircleOutlined, CloseCircleOutlined, EyeOutlined } from '@ant-design/icons'
 import { getPendingAuditRegistrations, getRegistration, auditRegistration } from '../../api'
 
+const statusMap: Record<string, { color: string; text: string }> = {
+  pending_audit: { color: 'orange', text: '待审核' },
+  auditing: { color: 'blue', text: '审核中' },
+  approved: { color: 'green', text: '已通过' },
+  rejected: { color: 'red', text: '已驳回' },
+}
+
 const RegistrationAudit: React.FC = () => {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,18 +57,12 @@ const RegistrationAudit: React.FC = () => {
     }
   }
 
-  const statusMap: Record<string, { color: string; text: string }> = {
-    pending: { color: 'orange', text: '待审核' },
-    approved: { color: 'green', text: '已通过' },
-    rejected: { color: 'red', text: '已驳回' },
-    resubmitted: { color: 'blue', text: '已重新提交' },
-  }
-
   const columns = [
     { title: '公司名称', dataIndex: 'company_name', key: 'company_name' },
+    { title: '统一社会信用代码', dataIndex: 'unified_credit_code', key: 'unified_credit_code', ellipsis: true },
     { title: '联系人', dataIndex: 'contact_person', key: 'contact_person' },
-    { title: '邮箱', dataIndex: 'email', key: 'email' },
-    { title: '电话', dataIndex: 'phone', key: 'phone' },
+    { title: '邮箱', dataIndex: 'contact_email', key: 'contact_email' },
+    { title: '电话', dataIndex: 'contact_phone', key: 'contact_phone' },
     { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => {
       const s = statusMap[v] || { color: 'default', text: v }
       return <Tag color={s.color}>{s.text}</Tag>
@@ -80,28 +81,37 @@ const RegistrationAudit: React.FC = () => {
 
   return (
     <div>
-      <Card title="供应商注册审核 (US-103)">
+      <Card title="供应商注册审核 (US-102-2 / US-103)">
         <Table rowKey="id" dataSource={data} columns={columns} loading={loading} pagination={{ pageSize: 10 }} />
       </Card>
 
-      <Modal title="注册详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={600}>
+      <Modal title="注册详情 (US-102-2)" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={640}>
         {detail && (
           <Descriptions bordered column={1} size="small">
             <Descriptions.Item label="公司名称">{detail.company_name}</Descriptions.Item>
+            <Descriptions.Item label="统一社会信用代码">{detail.unified_credit_code}</Descriptions.Item>
             <Descriptions.Item label="联系人">{detail.contact_person}</Descriptions.Item>
-            <Descriptions.Item label="邮箱">{detail.email}</Descriptions.Item>
-            <Descriptions.Item label="电话">{detail.phone}</Descriptions.Item>
-            <Descriptions.Item label="经营范围">{detail.business_scope || '-'}</Descriptions.Item>
-            <Descriptions.Item label="注册资本">{detail.registered_capital || '-'}</Descriptions.Item>
+            <Descriptions.Item label="邮箱">{detail.contact_email || '-'}</Descriptions.Item>
+            <Descriptions.Item label="电话">{detail.contact_phone || '-'}</Descriptions.Item>
+            <Descriptions.Item label="主营品类">{detail.main_categories || '-'}</Descriptions.Item>
+            <Descriptions.Item label="年供货能力(吨)">{detail.annual_capacity ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="地址">{detail.address || '-'}</Descriptions.Item>
-            <Descriptions.Item label="状态"><Tag color={statusMap[detail.status]?.color}>{statusMap[detail.status]?.text || detail.status}</Tag></Descriptions.Item>
-            {detail.reject_reason && <Descriptions.Item label="驳回原因">{detail.reject_reason}</Descriptions.Item>}
+            <Descriptions.Item label="状态">
+              <Tag color={statusMap[detail.status]?.color}>{statusMap[detail.status]?.text || detail.status}</Tag>
+            </Descriptions.Item>
+            {detail.invitation?.invitation_code && (
+              <Descriptions.Item label="邀请码">{detail.invitation.invitation_code}</Descriptions.Item>
+            )}
+            {detail.audit_opinion && <Descriptions.Item label="审核意见">{detail.audit_opinion}</Descriptions.Item>}
+            <Descriptions.Item label="提交时间">
+              {detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}
+            </Descriptions.Item>
           </Descriptions>
         )}
       </Modal>
 
       <Modal
-        title={auditAction === 'approve' ? '通过注册' : '驳回注册'}
+        title={auditAction === 'approve' ? '通过注册 (US-103-1)' : '驳回注册 (US-103-1)'}
         open={auditModalOpen}
         onOk={handleAudit}
         onCancel={() => { setAuditModalOpen(false); form.resetFields() }}

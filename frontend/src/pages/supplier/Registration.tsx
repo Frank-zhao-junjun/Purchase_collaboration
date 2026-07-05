@@ -1,26 +1,31 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Card, Form, Input, Button, Steps, Result, Descriptions, Tag, message } from 'antd'
 import { UserOutlined, MailOutlined, PhoneOutlined, HomeOutlined, SearchOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import { registerSupplier, validateInvitationCode, getRegistrationStatus } from '../../api'
 
 const SupplierRegistration: React.FC = () => {
-  const [step, setStep] = useState(0) // 0:验证邀请码, 1:填写信息, 2:完成
+  const [searchParams] = useSearchParams()
+  const [step, setStep] = useState(0)
   const [invitationInfo, setInvitationInfo] = useState<any>(null)
-  const [registrationResult, setRegistrationResult] = useState<any>(null)
   const [statusData, setStatusData] = useState<any>(null)
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusUcc, setStatusUcc] = useState('')
   const [form] = Form.useForm()
   const [codeForm] = Form.useForm()
 
-  // 验证邀请码
-  const handleValidateCode = async () => {
+  const handleValidateCode = useCallback(async (codeOverride?: string) => {
     try {
-      const values = await codeForm.validateFields()
-      const res = await validateInvitationCode(values.code) as any
+      const code = (codeOverride ?? (await codeForm.validateFields()).code)?.trim().toUpperCase()
+      if (!code) return
+      const res = await validateInvitationCode(code) as any
       if (res.valid) {
         setInvitationInfo(res)
-        form.setFieldsValue({ invitation_code: values.code })
+        form.setFieldsValue({
+          invitation_code: code,
+          company_name: res.invited_supplier_name || undefined,
+          contact_email: res.invited_email || undefined,
+        })
         setStep(1)
       } else {
         message.error(res.message || '邀请码无效')
@@ -29,14 +34,21 @@ const SupplierRegistration: React.FC = () => {
       if (e?.errorFields) return
       message.error('验证失败')
     }
-  }
+  }, [codeForm, form])
+
+  useEffect(() => {
+    const code = searchParams.get('code')?.trim().toUpperCase()
+    if (code) {
+      codeForm.setFieldsValue({ code })
+      handleValidateCode(code)
+    }
+  }, [searchParams, codeForm, handleValidateCode])
 
   // 提交注册
   const handleRegister = async () => {
     try {
       const values = await form.validateFields()
       const res = await registerSupplier(values) as any
-      setRegistrationResult(res)
       setStep(2)
       message.success('注册成功')
     } catch (e: any) {
@@ -65,7 +77,7 @@ const SupplierRegistration: React.FC = () => {
           <>
             <Form form={codeForm} layout="vertical" style={{ maxWidth: 400, margin: '0 auto' }}>
               <Form.Item name="code" label="邀请码" rules={[{ required: true, message: '请输入邀请码' }]}>
-                <Input.Search placeholder="请输入8位邀请码" maxLength={8} enterButton="验证" onSearch={handleValidateCode} size="large" style={{ textTransform: 'uppercase' }} />
+                <Input.Search placeholder="请输入8位邀请码" maxLength={8} enterButton="验证" onSearch={() => handleValidateCode()} size="large" style={{ textTransform: 'uppercase' }} />
               </Form.Item>
             </Form>
             <div style={{ textAlign: 'center', marginTop: 16 }}>

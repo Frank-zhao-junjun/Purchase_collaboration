@@ -30,6 +30,7 @@ import SupplierRegistration from './pages/supplier/Registration'
 import SupplierQualification from './pages/supplier/QualificationList'
 import SupplierCertification from './pages/supplier/CertificationList'
 import SupplierInvitationList from './pages/supplier/InvitationList'
+import RegistrationInvitationList from './pages/supplier/RegistrationInvitationList'
 import BidList from './pages/supplier/BidList'
 import SupplierContractList from './pages/supplier/ContractList'
 import SupplierOrderConfirm from './pages/supplier/OrderConfirm'
@@ -83,6 +84,7 @@ function App() {
               <Route index element={<SupplierHome />} />
               {/* Phase 1: 供应商准入 */}
               <Route path="registration" element={<SupplierRegistration />} />
+              <Route path="registration-invitations" element={<RegistrationInvitationList />} />
               <Route path="qualifications" element={<SupplierQualification />} />
               <Route path="certifications" element={<SupplierCertification />} />
               {/* Phase 2: 寻源协同 */}

@@ -17,7 +17,8 @@ const SupplierHome: React.FC = () => {
   })
 
   const quickActions = [
-    { icon: <MessageOutlined />, label: '收到的邀请', color: '#3E5BF2', path: '/supplier/invitations' },
+    { icon: <SendOutlined />, label: '注册邀请', color: '#52c41a', path: '/supplier/registration-invitations' },
+    { icon: <MessageOutlined />, label: '寻源邀请', color: '#3E5BF2', path: '/supplier/invitations' },
     { icon: <SwapOutlined />, label: '投标管理', color: '#FA8C16', path: '/supplier/bids' },
     { icon: <TrophyOutlined />, label: '合同管理', color: '#52c41a', path: '/supplier/contracts' },
     { icon: <FundProjectionScreenOutlined />, label: '产能响应', color: '#13c2c2', path: '/supplier/capacity' },

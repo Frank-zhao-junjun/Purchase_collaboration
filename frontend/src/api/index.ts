@@ -53,7 +53,7 @@ export const createInvitation = (data: {
   expiry_days?: number
 }) => api.post('/supplier-portal/invitations', data)
 
-export const getInvitations = (params?: { status?: string }) =>
+export const getInvitations = (params?: { status?: string; email?: string }) =>
   api.get('/supplier-portal/invitations', { params })
 
 export const deleteInvitation = (id: number) =>
