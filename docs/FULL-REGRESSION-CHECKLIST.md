@@ -14,11 +14,53 @@
 | 数据依赖 | 用例共享 `ST` 状态，**必须按文件顺序**执行 |
 | 干净库 | 首次或遇唯一约束冲突时加 `-Fresh` / `init_db.py` 重建 |
 
-全部通过后，可将 [RALPH-TODO.md](./RALPH-TODO.md) 顶层「全量 US 回归验收」勾选，并更新 README 中「全量 US 全部通过」声明。
+---
+
+## 2. 注意事项
+
+### 2.1 执行纪律（必守）
+
+- **禁止并行：** 不得使用 `pytest-xdist` 或多进程跑 `test_user_stories_smoke.py`。
+- **必须串行：** 67 条用例共享文件内状态对象 `ST`，**必须按 `test_user_stories_smoke.py` 中的定义顺序**从头到尾执行。
+- **`-k` 过滤：** 仅用于定位失败 Phase；过滤后仍按文件顺序跑匹配项。**不要只跑某个 Phase 的后半段**（例如单独跑 `test_us_401_2` 而不跑前面的 `test_us_401_1`）。
+- **API 地址：** 默认 `http://127.0.0.1:8000`；Docker/Nginx 场景通过 `XIJIU_API_BASE` 指定（见 `run-us-tests.ps1`）。
+- **干净库：** 首次全量回归、或出现唯一约束 / 脏数据导致随机失败时，务必 `init_db.py` 或 `.\scripts\run-us-tests.ps1 -Fresh` 后再跑。
+
+### 2.2 验收范围说明
+
+- 本清单验收的是 **API 层 US 烟测**（`tests/api/test_user_stories_smoke.py`），**不是** E2E Playwright（`tests/e2e/` 为可选补充）。
+- Phase 矩阵中的 **「可选 UI 抽检」** 不替代 pytest；仅在 API 全绿后按需人工点验页面。
+- **不要在未实际跑通 pytest 的情况下** 对外宣称「全量 US 已通过」。
+
+### 2.3 全部通过后的必做事项
+
+仅在 **`pytest tests/api/test_user_stories_smoke.py -v` 显示 67 passed** 时执行：
+
+1. **填写回归记录** — 使用本文 [§8 回归记录模板](#8-回归记录模板)，保存日期、环境、命令、结果。
+2. **勾选 RALPH-TODO** — 打开 [RALPH-TODO.md](./RALPH-TODO.md)，将顶层  
+   `- [ ] 全量 US 回归验收`  
+   改为  
+   `- [x] 全量 US 回归验收`（可附执行日期与 `67 passed`）。
+3. **更新 README 声明** — 打开 [README.md](../README.md) 中 **「全量 US 测试结果」** 小节：
+   - 将表格日期更新为**实际跑通日期**（勿沿用旧日期）；
+   - 确认 Phase 1~4、US-501 行仍为「✅ 全部通过」且与本次 pytest 结果一致；
+   - 若 Phase 3/4 曾修复 P0 端点，README 的 API 清单应与当前 `backend/app/api/*` 一致（可参考 [REPO-REVIEW-2026-07-05.md](./REPO-REVIEW-2026-07-05.md)）。
+4. **（可选）** 同步 [AGENTS.md](../AGENTS.md) 功能矩阵状态，与 RALPH-TODO 保持一致。
+
+### 2.4 未通过或部分通过时
+
+- **不要** 勾选 RALPH-TODO「全量 US 回归验收」。
+- **不要** 将 README 写成「全量 US 全部通过」。
+- 记录**首个失败用例**与 traceback → 按 Phase `-k` 复现 → 修复后 **`-Fresh` 全量重跑**（避免 `ST` 半途中断导致误判）。
+
+### 2.5 提交与协作
+
+- 代码修复与文档更新（RALPH-TODO / README）可分开 commit；文档更新建议在 pytest 绿屏**之后**再提交。
+- 推送远程前建议本地或 CI 再跑一遍全量烟测，防止环境差异导致误报。
 
 ---
 
-## 2. 环境准备
+## 3. 环境准备
 
 ### 方式 A：本地开发（SQLite，推荐调试）
 
