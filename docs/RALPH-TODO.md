@@ -17,7 +17,7 @@
 - [x] Phase 3 执行闭环：`US-301-1 ~ US-310-2` ✅ P0 已落地，前端已补强（2026-07-05）
 - [x] Phase 4 财务闭环：`US-401-1 ~ US-405-2` ✅ commit `b2411b8` + 前端已完整（2026-07-05 确认）
 - [x] US-501 公告闭环：`US-501-1 ~ US-501-2` ✅ commit `b3edb89`
-- [ ] 全量 US 回归验收 → 见 [FULL-REGRESSION-CHECKLIST.md](./FULL-REGRESSION-CHECKLIST.md)
+- [x] 全量 US 回归验收 → 见 [FULL-REGRESSION-CHECKLIST.md](./FULL-REGRESSION-CHECKLIST.md) — ✅ 2026-07-05，67 passed (clean DB, serial, no xdist)
 
 ## 当前修复优先级
 

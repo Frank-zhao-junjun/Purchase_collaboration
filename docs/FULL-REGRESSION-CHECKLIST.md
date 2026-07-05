@@ -327,3 +327,23 @@ README 已更新：[ ] 是 / [ ] 否
 - Ralph 进度：[RALPH-TODO.md](./RALPH-TODO.md)
 - 仓库审查：[REPO-REVIEW-2026-07-05.md](./REPO-REVIEW-2026-07-05.md)
 - 测试说明：[tests/api/README.md](../tests/api/README.md)
+
+---
+
+## 10. 回归记录
+
+### 2026-07-05
+
+```
+日期：2026-07-05
+执行人：Agent (Vibe Coding)
+环境：本地 SQLite（sandbox，Python 3.12，FastAPI 0.109，uvicorn 0.27）
+命令：XIJIU_API_BASE=http://127.0.0.1:8000 pytest tests/api/test_user_stories_smoke.py -v --tb=short
+结果：67 passed / 0 failed (1.12s)
+失败用例：无
+根因：N/A
+修复 commit：N/A（首次全量即通过）
+复验：clean DB (rm supply_chain.db + init_db.py) → 全量串行 → 67 passed
+RALPH-TODO 已勾选：[x] 是
+README 已更新：[x] 是（日期更新为 2026-07-05）
+```
