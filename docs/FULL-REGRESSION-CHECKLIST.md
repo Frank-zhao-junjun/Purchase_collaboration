@@ -44,7 +44,7 @@
 3. **更新 README 声明** — 打开 [README.md](../README.md) 中 **「全量 US 测试结果」** 小节：
    - 将表格日期更新为**实际跑通日期**（勿沿用旧日期）；
    - 确认 Phase 1~4、US-501 行仍为「✅ 全部通过」且与本次 pytest 结果一致；
-   - 若 Phase 3/4 曾修复 P0 端点，README 的 API 清单应与当前 `backend/app/api/*` 一致（可参考 [REPO-REVIEW-2026-07-05.md](./REPO-REVIEW-2026-07-05.md)）。
+   - 若 Phase 3/4 曾修复 P0 端点，README 的 API 清单应与当前 `backend/app/api/*` 一致（可参考 [RALPH-TODO.md](./RALPH-TODO.md) 中的「Phase 3 P0 修复反馈」表格）。
 4. **（可选）** 同步 [AGENTS.md](../AGENTS.md) 功能矩阵状态，与 RALPH-TODO 保持一致。
 
 ### 2.4 未通过或部分通过时
@@ -64,6 +64,8 @@
 
 ### 方式 A：本地开发（SQLite，推荐调试）
 
+#### A1. 已有可用 Python 环境
+
 ```powershell
 cd backend
 python -m pip install -r requirements.txt
@@ -78,6 +80,33 @@ cd <项目根>
 python -m pip install -r requirements-dev.txt
 $env:XIJIU_API_BASE = "http://127.0.0.1:8000"
 python -m pytest tests/api/test_user_stories_smoke.py -v --tb=short
+```
+
+#### A2. Windows 无系统 Python 时的已验证路径（推荐）
+
+当前仓库已在本工作区通过 `uv + Python 3.12` 验证分 Phase 烟测，可作为本地回归基线。
+
+```powershell
+cd <项目根>
+uv python install 3.12
+uv venv .venv312 --python 3.12
+uv pip install --python .\.venv312\Scripts\python.exe fastapi==0.109.0 "uvicorn[standard]==0.27.0" sqlalchemy==2.0.25 aiosqlite==0.19.0 pydantic==2.5.3 pydantic-settings==2.1.0 python-multipart==0.0.6 pytest>=7.4.0 httpx>=0.27.0 python-dateutil
+```
+
+初始化数据库并启动后端：
+
+```powershell
+cd backend
+..\.venv312\Scripts\python.exe init_db.py
+..\.venv312\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+另开终端执行回归：
+
+```powershell
+cd <项目根>
+$env:XIJIU_API_BASE = "http://127.0.0.1:8000"
+.\.venv312\Scripts\python.exe -m pytest tests/api/test_user_stories_smoke.py -v --tb=short
 ```
 
 ### 方式 B：Docker 一键（演示/CI 近似）
@@ -103,7 +132,7 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 
 ---
 
-## 3. 执行命令速查
+## 4. 执行命令速查
 
 | 场景 | 命令 |
 |------|------|
@@ -119,7 +148,7 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 
 ---
 
-## 4. Phase 回归矩阵
+## 5. Phase 回归矩阵
 
 状态列用于人工勾选；自动化以 pytest 结果为准。
 
@@ -129,20 +158,20 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 |------|-----|------|---------------------|
 | [ ] `test_us_101_1` | 101-1 | 采购 | `POST /supplier-portal/invitations` |
 | [ ] `test_us_101_2` | 101-2 | 供应商 | `GET /supplier-portal/invitations?email=` |
-| [ ] `test_us_102_1` | 102-1 | 供应商 | `POST /register` |
-| [ ] `test_us_102_2` | 102-2 | 采购 | `GET /register/pending-audit` |
+| [ ] `test_us_102_1` | 102-1 | 供应商 | `POST /supplier-portal/register` |
+| [ ] `test_us_102_2` | 102-2 | 采购 | `GET /supplier-portal/registrations/{id}` |
 | [ ] `test_us_103_1` | 103-1 | 采购 | 审批通过/驳回 |
-| [ ] `test_us_103_2` | 103-2 | 供应商 | `POST /register/resubmit` |
+| [ ] `test_us_103_2` | 103-2 | 供应商 | `GET /supplier-portal/register/status` + 注册→驳回→`POST .../resubmit` |
 | [ ] `test_us_104_1` | 104-1 | 采购 | `POST /qualification/projects` |
-| [ ] `test_us_104_2` | 104-2 | 供应商 | `GET /qualification/projects?supplier_id=` |
-| [ ] `test_us_105_1` | 105-1 | 供应商 | 问卷 `POST .../submission` |
-| [ ] `test_us_105_2` | 105-2 | 采购 | `GET .../submissions/{supplier_id}` |
-| [ ] `test_us_106_1` | 106-1 | 采购 | 评审打分/澄清 |
-| [ ] `test_us_106_2` | 106-2 | 供应商 | 查看评审结果 |
+| [ ] `test_us_104_2` | 104-2 | 供应商 | `GET /qualification/projects?supplier_id=` + `GET /qualification/projects/{id}` |
+| [ ] `test_us_105_1` | 105-1 | 供应商 | `POST /qualification/projects/{id}/submission` |
+| [ ] `test_us_105_2` | 105-2 | 采购 | `GET /qualification/projects/{id}/submissions` + `GET /qualification/projects/{id}/submissions/{supplier_id}` |
+| [ ] `test_us_106_1` | 106-1 | 采购 | 评审打分 `POST .../submissions/{sid}/review` → 含 final_score |
+| [ ] `test_us_106_2` | 106-2 | 供应商 | `GET /qualification/projects/{id}/status?supplier_id=` → 含 final_score |
 | [ ] `test_us_107_1` | 107-1 | 采购 | 最终批准/拒绝 |
 | [ ] `test_us_107_2` | 107-2 | 供应商 | 查看最终决定 |
 | [ ] `test_us_108_1` | 108-1 | 采购 | 资质预警/重认证邀请 |
-| [ ] `test_us_108_2` | 108-2 | 供应商 | 查看预警与邀请 |
+| [ ] `test_us_108_2` | 108-2 | 供应商 | `GET /supplier-portal/suppliers/{id}/certifications`（验证资质列表） |
 | [ ] `test_us_109_1` | 109-1 | 供应商 | 资质更新/重认证材料 |
 | [ ] `test_us_109_2` | 109-2 | 采购 | 查看资质更新记录 |
 
@@ -154,22 +183,22 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 
 | 用例 | US | 角色 | 关键 API |
 |------|-----|------|----------|
-| [ ] `test_us_201_1` | 201-1 | 采购 | `POST /sourcing/` |
-| [ ] `test_us_201_2` | 201-2 | 供应商 | `GET /sourcing/` |
+| [ ] `test_us_201_1` | 201-1 | 采购 | `POST /sourcing/projects` |
+| [ ] `test_us_201_2` | 201-2 | 供应商 | `GET /sourcing/projects/{id}` |
 | [ ] `test_us_202_1` | 202-1 | 供应商 | accept/decline 邀请 |
-| [ ] `test_us_202_2` | 202-2 | 采购 | 查看邀请响应 |
+| [ ] `test_us_202_2` | 202-2 | 采购 | `GET /sourcing/projects/{id}` 查看邀请响应 |
 | [ ] `test_us_203_1` | 203-1 | 采购 | 授标 |
-| [ ] `test_us_203_2` | 203-2 | 供应商 | 查看中标/落标 |
-| [ ] `test_us_204_1` | 204-1 | 采购 | 合同草案 |
-| [ ] `test_us_204_2` | 204-2 | 供应商 | 查看草案 |
-| [ ] `test_us_205_1` | 205-1 | 供应商 | 修改意见 |
-| [ ] `test_us_205_2` | 205-2 | 采购 | 查看意见 |
+| [ ] `test_us_203_2` | 203-2 | 供应商 | `GET /sourcing/projects/{id}` 查看授标结果 |
+| [ ] `test_us_204_1` | 204-1 | 采购 | `POST /contracts/generate-from-sourcing/{id}` |
+| [ ] `test_us_204_2` | 204-2 | 供应商 | `GET /contracts/drafts/{id}` |
+| [ ] `test_us_205_1` | 205-1 | 供应商 | `POST /contracts/{id}/feedback` |
+| [ ] `test_us_205_2` | 205-2 | 采购 | `GET /contracts/{id}/feedback-items` |
 | [ ] `test_us_206_1` | 206-1 | 采购 | 发起签署 |
 | [ ] `test_us_206_2` | 206-2 | 供应商 | 签署 |
 | [ ] `test_us_207_1` | 207-1 | 供应商 | 签署状态 |
 | [ ] `test_us_207_2` | 207-2 | 采购 | 签署状态 |
 | [ ] `test_us_208_1` | 208-1 | 采购 | 修改合同状态 |
-| [ ] `test_us_208_2` | 208-2 | 供应商 | 查看状态变更 |
+| [ ] `test_us_208_2` | 208-2 | 供应商 | `GET /contracts/{id}` 查看状态变更 |
 
 **可选 UI 抽检：** `/buyer/sourcing` → `/supplier/invitations` → `/buyer/contracts`
 
@@ -179,26 +208,26 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 
 | 用例 | US | 角色 | 关键 API / 状态流 |
 |------|-----|------|-------------------|
-| [ ] `test_us_301_1` | 301-1 | 采购 | `POST /collaboration/forecasts` + publish |
-| [ ] `test_us_301_2` | 301-2 | 供应商 | `GET /collaboration/forecasts` |
-| [ ] `test_us_302_1` | 302-1 | 供应商 | `POST .../responses` |
-| [ ] `test_us_302_2` | 302-2 | 采购 | `GET .../responses` |
+| [ ] `test_us_301_1` | 301-1 | 采购 | `POST /collaboration/forecasts` → publish → `assert published` |
+| [ ] `test_us_301_2` | 301-2 | 供应商 | `GET /collaboration/forecasts?supplier_id=1` → 列表含创建的预测 |
+| [ ] `test_us_302_1` | 302-1 | 供应商 | `POST /collaboration/forecasts/{id}/responses` → `success=true` |
+| [ ] `test_us_302_2` | 302-2 | 采购 | `GET /collaboration/forecasts/{id}/responses` → 列表含响应 |
 | [ ] `test_us_303_1` | 303-1 | 采购 | `POST /purchase-orders/` |
-| [ ] `test_us_303_2` | 303-2 | 供应商 | `POST .../supplier-confirm` |
-| [ ] `test_us_304_1` | 304-1 | 采购 | 订单 cancel |
-| [ ] `test_us_304_2` | 304-2 | 供应商 | 查看 cancel 状态 |
+| [ ] `test_us_303_2` | 303-2 | 供应商 | `POST /purchase-orders/{id}/supplier-confirm` |
+| [ ] `test_us_304_1` | 304-1 | 采购 | `PUT /purchase-orders/{id}` → `status: "cancelled"` |
+| [ ] `test_us_304_2` | 304-2 | 供应商 | `GET /purchase-orders/{id}` → 确认 cancelled |
 | [ ] `test_us_305_1` | 305-1 | 采购 | `POST /collaboration/delivery-schedules` |
 | [ ] `test_us_305_2` | 305-2 | 供应商 | 查看要货计划 |
 | [ ] `test_us_306_1` | 306-1 | 供应商 | supplier-confirm → `confirmed` |
 | [ ] `test_us_306_2` | 306-2 | 采购 | 查看已确认计划 |
-| [ ] `test_us_307_1` | 307-1 | 供应商 | ASN 创建 → `draft` |
-| [ ] `test_us_307_2` | 307-2 | 采购 | 列表含 ASN |
-| [ ] `test_us_308_1` | 308-1 | 采购 | submit → approve → `approved` |
-| [ ] `test_us_308_2` | 308-2 | 供应商 | 详情 status=approved |
-| [ ] `test_us_309_1` | 309-1 | 供应商 | `POST .../packing-lists` |
-| [ ] `test_us_309_2` | 309-2 | 采购 | `GET .../packing-lists` |
-| [ ] `test_us_310_1` | 310-1 | 采购 | `POST /logistics/receipts/` |
-| [ ] `test_us_310_2` | 310-2 | 供应商 | 查看收货 |
+| [ ] `test_us_307_1` | 307-1 | 供应商 | `POST /logistics/shipment-notes/` → `draft` |
+| [ ] `test_us_307_2` | 307-2 | 采购 | `GET /logistics/shipment-notes/` → 列表含新 ASN |
+| [ ] `test_us_308_1` | 308-1 | 采购 | `POST /logistics/shipment-notes/{id}/submit` → approve → `approved` |
+| [ ] `test_us_308_2` | 308-2 | 供应商 | `GET /logistics/shipment-notes/{id}` → status=approved |
+| [ ] `test_us_309_1` | 309-1 | 供应商 | `POST /logistics/shipment-notes/{id}/packing-lists` → `success=true` |
+| [ ] `test_us_309_2` | 309-2 | 采购 | `GET /logistics/shipment-notes/{id}/packing-lists` → 列表非空 |
+| [ ] `test_us_310_1` | 310-1 | 采购 | `POST /logistics/receipts/` → status=qualified |
+| [ ] `test_us_310_2` | 310-2 | 供应商 | `GET /logistics/receipts/` → 列表含收货记录 |
 
 **P0 回归重点：** `/collaboration/*` 可达、`/logistics/.../submit|approve|packing-lists` 存在。
 
@@ -218,8 +247,8 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 | [ ] `test_us_403_2` | 403-2 | 采购 | three-way-match + approve → `verified` |
 | [ ] `test_us_404_1` | 404-1 | 供应商 | reject → resubmit |
 | [ ] `test_us_404_2` | 404-2 | 采购 | 查看重提发票 |
-| [ ] `test_us_405_1` | 405-1 | 采购 | `POST /financial/payments/` |
-| [ ] `test_us_405_2` | 405-2 | 供应商 | `GET /financial/payments/?supplier_id=` |
+| [ ] `test_us_405_1` | 405-1 | 采购 | `POST /financial/payments/` → 创建付款记录 |
+| [ ] `test_us_405_2` | 405-2 | 供应商 | `GET /financial/payments/?supplier_id=1` → 列表含付款记录 |
 
 **可选 UI 抽检：** `/buyer/financial`（结算审核/三单匹配/付款）→ `/supplier/settlements` → `/supplier/invoices`
 
@@ -238,7 +267,7 @@ Linux/macOS：`./scripts/run-us-tests.sh [--fresh] [--nginx]`
 
 ---
 
-## 5. 推荐执行顺序
+## 6. 推荐执行顺序
 
 ```mermaid
 flowchart LR
@@ -255,24 +284,26 @@ flowchart LR
 1. **Smoke：** `test_health`
 2. **Phase 1 → 2 → 3 → 4 → 501**（文件默认顺序，勿打乱）
 3. **失败时：** 记录首个失败用例名 → 用 `-k` 从 Phase 起点重跑（或 `-Fresh` 全量重跑）
-4. **通过后：** 勾选 RALPH-TODO、按需跑 E2E（`tests/e2e/`，非 US 矩阵必需）
+4. **通过后：** 按 [§2.3 全部通过后的必做事项](#23-全部通过后的必做事项) 更新 RALPH-TODO 与 README；按需跑 E2E（非 US 矩阵必需）
 
 ---
 
-## 6. 常见问题
+## 7. 常见问题
 
 | 现象 | 可能原因 | 处理 |
 |------|----------|------|
 | 404 on `/collaboration/*` | router 未挂载 | 检查 `main.py` 含 `collaboration.router` |
 | 404 on `packing-lists` / `submit` | logistics 端点缺失 | 检查 `logistics.py` US-308/309 |
+| 500 on `/contracts/{id}/sign-status` | `contract.status` 被当作 enum 读取，但实际是字符串 | 检查 `sourcing.py` 中 sign-status 返回值兼容 enum/string |
 | 422 on `/announcements/types/summary` | 路由顺序 | `types/summary` 须在 `/{id}` 前 |
 | 409 / UNIQUE 约束 | 旧库脏数据 | `init_db.py` 或 `-Fresh` |
+| 500 on `/financial/invoices/` | 自动生成 `invoice_no` 冲突 | 检查 `financial.py` 的发票号生成是否含足够随机性 |
 | 前面过、后面挂 | 并行跑或跳过用例 | 禁用 xdist，全文件串行 |
 | Phase 4 三单匹配 fail | 发票金额 > 结算单 | 检查 `three-way-match` 逻辑 |
 
 ---
 
-## 7. 回归记录模板
+## 8. 回归记录模板
 
 ```
 日期：
@@ -284,11 +315,13 @@ flowchart LR
 根因：
 修复 commit：
 复验：
+RALPH-TODO 已勾选：[ ] 是 / [ ] 否
+README 已更新：[ ] 是 / [ ] 否
 ```
 
 ---
 
-## 8. 相关文档
+## 9. 相关文档
 
 - 用户故事定义：[US.txt](./US.txt)
 - Ralph 进度：[RALPH-TODO.md](./RALPH-TODO.md)
