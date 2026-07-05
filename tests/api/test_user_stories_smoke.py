@@ -150,11 +150,21 @@ def test_us_103_1(client):
         json={"action": "approve", "opinion": "US-103-1"},
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body.get("supplier_id")
+    assert body.get("supplier_name") == ST.registration_company_name
+    detail = client.get(f"/supplier-portal/registrations/{ST.registration_id}").json()
+    assert detail["status"] == "approved"
+    assert detail["audit_opinion"] == "US-103-1"
+    assert detail.get("supplier_id") == body["supplier_id"]
 
 
 def test_us_103_2(client):
     """驳回后重新提交（供应商）"""
     s = _suffix()
+    ucc = f"92220000{s.upper()}MA002"
+    company_revised = f"驳回公司{s}（已修订）"
     inv = client.post(
         "/supplier-portal/invitations",
         json={
@@ -163,32 +173,57 @@ def test_us_103_2(client):
             "expiry_days": 7,
         },
     )
+    assert inv.status_code == 200
     code = inv.json()["invitation_code"]
     reg = client.post(
         "/supplier-portal/register",
         json={
             "invitation_code": code,
             "company_name": f"驳回公司{s}",
-            "unified_credit_code": f"92220000{s.upper()}MA002",
+            "unified_credit_code": ucc,
             "contact_person": "张",
             "contact_phone": "13900000000",
         },
     )
+    assert reg.status_code == 200
     rid = reg.json()["id"]
-    client.post(
+    reject = client.post(
         f"/supplier-portal/registrations/{rid}/audit",
         json={"action": "reject", "opinion": "请补资料 US-103-2"},
     )
+    assert reject.status_code == 200
+    assert reject.json()["success"] is True
+    rejected = client.get(f"/supplier-portal/registrations/{rid}").json()
+    assert rejected["status"] == "rejected"
+    assert rejected["audit_opinion"] == "请补资料 US-103-2"
+    status = client.get(
+        "/supplier-portal/register/status",
+        params={"unified_credit_code": ucc},
+    ).json()
+    assert status["found"] is True
+    assert status["status"] == "rejected"
+    assert status["audit_opinion"] == "请补资料 US-103-2"
     r2 = client.post(
         f"/supplier-portal/registrations/{rid}/resubmit",
         json={
-            "company_name": f"驳回公司{s}（已修订）",
-            "unified_credit_code": f"92220000{s.upper()}MA002",
+            "company_name": company_revised,
+            "unified_credit_code": ucc,
             "contact_person": "张",
             "contact_phone": "13900000001",
         },
     )
     assert r2.status_code == 200
+    resubmit_body = r2.json()
+    assert resubmit_body["success"] is True
+    assert resubmit_body["status"] == "pending_audit"
+    assert resubmit_body["company_name"] == company_revised
+    detail = client.get(f"/supplier-portal/registrations/{rid}").json()
+    assert detail["status"] == "pending_audit"
+    assert detail["company_name"] == company_revised
+    assert detail["contact_phone"] == "13900000001"
+    assert detail["audit_opinion"] is None
+    pending_ids = [p["id"] for p in client.get("/supplier-portal/pending-audit").json()]
+    assert rid in pending_ids
 
 
 def test_us_104_1(client):

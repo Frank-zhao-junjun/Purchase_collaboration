@@ -100,6 +100,7 @@ export const resubmitRegistration = (id: number, data: {
   contact_email?: string
   address?: string
   main_categories?: string
+  annual_capacity?: number
 }) => api.post(`/supplier-portal/registrations/${id}/resubmit`, data)
 
 // US-104~107: 资格评审

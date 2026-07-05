@@ -299,6 +299,13 @@ async def check_registration_status(
         "found": True,
         "id": reg.id,
         "company_name": reg.company_name,
+        "unified_credit_code": reg.unified_credit_code,
+        "contact_person": reg.contact_person,
+        "contact_phone": reg.contact_phone,
+        "contact_email": reg.contact_email,
+        "address": reg.address,
+        "main_categories": reg.main_categories,
+        "annual_capacity": reg.annual_capacity,
         "status": reg.status.value,
         "audit_opinion": reg.audit_opinion,
         "created_at": reg.created_at
@@ -381,6 +388,7 @@ async def get_registration_detail(
         "audit_opinion": reg.audit_opinion,
         "audited_by": reg.audited_by,
         "audited_at": reg.audited_at,
+        "supplier_id": reg.supplier_id,
         "created_at": reg.created_at,
         "invitation": invitation_info
     }
@@ -487,7 +495,14 @@ async def resubmit_registration(
     reg.audited_by = None
     reg.audited_at = None
     await db.flush()
-    return {"success": True, "message": "重新提交成功，等待审核"}
+    await db.refresh(reg)
+    return {
+        "success": True,
+        "message": "重新提交成功，等待审核",
+        "id": reg.id,
+        "status": reg.status.value,
+        "company_name": reg.company_name,
+    }
 
 
 # ==================== US-108: 资质证书与过期预警 ====================

@@ -47,7 +47,10 @@ const RegistrationAudit: React.FC = () => {
         action: auditAction,
         opinion: values.reason || values.opinion || '',
       })
-      message.success(auditAction === 'approve' ? '已通过' : '已驳回')
+      const msg = auditAction === 'approve'
+        ? '已通过，供应商主数据已创建'
+        : '已驳回，供应商可修订后重新提交'
+      message.success(msg)
       setAuditModalOpen(false)
       form.resetFields()
       fetchData()
@@ -81,7 +84,7 @@ const RegistrationAudit: React.FC = () => {
 
   return (
     <div>
-      <Card title="供应商注册审核 (US-102-2 / US-103)">
+      <Card title="供应商注册审核 (US-103-1)">
         <Table rowKey="id" dataSource={data} columns={columns} loading={loading} pagination={{ pageSize: 10 }} />
       </Card>
 
