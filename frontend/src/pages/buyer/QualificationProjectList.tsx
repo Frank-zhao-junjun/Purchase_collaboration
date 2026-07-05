@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Tag, Button, Modal, Form, Input, Select, Card, message, Descriptions } from 'antd'
-import { PlusOutlined, EyeOutlined } from '@ant-design/icons'
-import { getQualificationProjects, createQualificationProject, getQualificationProject, getQualificationSubmissions } from '../../api'
+import { Table, Tag, Button, Modal, Form, Input, Select, Card, message, Descriptions, Alert } from 'antd'
+import { PlusOutlined, EyeOutlined, FileSearchOutlined } from '@ant-design/icons'
+import {
+  getQualificationProjects, createQualificationProject, getQualificationProject,
+  getQualificationSubmissions, getQualificationSubmission,
+} from '../../api'
 import { getSuppliers } from '../../api'
 
 const statusMap: Record<string, { color: string; text: string }> = {
@@ -10,6 +13,30 @@ const statusMap: Record<string, { color: string; text: string }> = {
   supplement_materials: { color: 'gold', text: '待补充材料' },
   approved: { color: 'green', text: '已通过' },
   rejected: { color: 'red', text: '已驳回' },
+}
+
+const answerLabels: Record<string, string> = {
+  company_scale: '企业规模',
+  registered_capital: '注册资本(万元)',
+  annual_revenue: '年营业额(万元)',
+  main_markets: '主要市场区域',
+  production_capacity: '年产能(吨)',
+  production_lines: '生产线数量',
+  warehouse_capacity: '仓储能力(吨)',
+  lead_time_days: '常规交期(天)',
+  has_iso9001: 'ISO9001认证',
+  has_iso22000: 'ISO22000认证',
+  has_haccp: 'HACCP认证',
+  quality_score_self: '自评质量得分',
+  quality_cert_files: '质量证书',
+  latest_revenue: '最近一年营业额(万元)',
+  latest_profit: '最近一年净利润(万元)',
+  current_assets: '流动资产(万元)',
+  current_liabilities: '流动负债(万元)',
+  has_tax_cert: '完税证明',
+  major_clients: '主要客户',
+  has_baijiu_exp: '白酒行业经验',
+  cooperation_files: '合作证明材料',
 }
 
 const QualificationProjectList: React.FC = () => {
@@ -21,6 +48,8 @@ const QualificationProjectList: React.FC = () => {
   const [detailOpen, setDetailOpen] = useState(false)
   const [detail, setDetail] = useState<any>(null)
   const [submissions, setSubmissions] = useState<any[]>([])
+  const [submissionOpen, setSubmissionOpen] = useState(false)
+  const [submissionDetail, setSubmissionDetail] = useState<any>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -70,6 +99,14 @@ const QualificationProjectList: React.FC = () => {
     } catch { message.error('获取详情失败') }
   }
 
+  const showSubmission = async (projectId: number, supplierId: number) => {
+    try {
+      const res = await getQualificationSubmission(projectId, supplierId) as any
+      setSubmissionDetail(res)
+      setSubmissionOpen(true)
+    } catch { message.error('获取提交详情失败') }
+  }
+
   const columns = [
     { title: '项目名称', dataIndex: 'project_name', key: 'project_name' },
     { title: '评审品类', dataIndex: 'target_categories', key: 'target_categories', ellipsis: true },
@@ -87,7 +124,7 @@ const QualificationProjectList: React.FC = () => {
 
   return (
     <div>
-      <Card title="资格评审项目 (US-104-1)" extra={
+      <Card title="资格评审项目 (US-104-1 / US-105-2)" extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>创建评审项目</Button>
       }>
         <Table rowKey="id" dataSource={data} columns={columns} loading={loading} pagination={{ pageSize: 10 }} />
@@ -117,7 +154,7 @@ const QualificationProjectList: React.FC = () => {
         </Form>
       </Modal>
 
-      <Modal title="评审项目详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={700}>
+      <Modal title="评审项目详情" open={detailOpen} onCancel={() => setDetailOpen(false)} footer={null} width={760}>
         {detail && (
           <>
             <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
@@ -128,23 +165,46 @@ const QualificationProjectList: React.FC = () => {
               <Descriptions.Item label="创建时间">{detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}</Descriptions.Item>
               {detail.notes && <Descriptions.Item label="评审要求" span={2}>{detail.notes}</Descriptions.Item>}
             </Descriptions>
-            <h4>受邀供应商</h4>
-            <Table rowKey="submission_id" dataSource={detail.invited_suppliers || submissions} columns={[
-              { title: '供应商', dataIndex: 'supplier_name', key: 'supplier_name' },
-              { title: '状态', dataIndex: 'status', key: 'status', render: (v: string) => {
-                const s = statusMap[v] || { color: 'default', text: v }
-                return <Tag color={s.color}>{s.text}</Tag>
-              }},
-            ]} size="small" pagination={false} style={{ marginBottom: 16 }} />
-            <h4>供应商提交记录</h4>
+            <h4>供应商提交记录 (US-105-2)</h4>
             <Table rowKey="submission_id" dataSource={submissions} columns={[
               { title: '供应商', dataIndex: 'supplier_name', key: 'supplier_name' },
               { title: '提交状态', dataIndex: 'status', key: 'status', render: (v: string) => {
                 const s = statusMap[v] || { color: 'default', text: v }
                 return <Tag color={s.color}>{s.text}</Tag>
               }},
+              { title: '已填问卷', dataIndex: 'has_answers', key: 'has_answers', render: (v: boolean) => v ? <Tag color="green">是</Tag> : <Tag>否</Tag> },
               { title: '提交时间', dataIndex: 'submitted_at', key: 'submitted_at', render: (v: string) => v ? new Date(v).toLocaleString() : '-' },
+              { title: '操作', key: 'action', render: (_: any, r: any) => (
+                r.has_answers ? (
+                  <Button type="link" size="small" icon={<FileSearchOutlined />} onClick={() => showSubmission(detail.id, r.supplier_id)}>
+                    查看问卷
+                  </Button>
+                ) : null
+              )},
             ]} size="small" pagination={false} />
+          </>
+        )}
+      </Modal>
+
+      <Modal title="供应商问卷详情 (US-105-2)" open={submissionOpen} onCancel={() => setSubmissionOpen(false)} footer={null} width={640}>
+        {submissionDetail && (
+          <>
+            <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="供应商">{submissionDetail.supplier_name}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <Tag color={statusMap[submissionDetail.status]?.color}>{statusMap[submissionDetail.status]?.text || submissionDetail.status}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="更新时间" span={2}>
+                {submissionDetail.updated_at ? new Date(submissionDetail.updated_at).toLocaleString() : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+            <Descriptions bordered column={1} size="small" title="问卷答案">
+              {Object.entries(submissionDetail.answers || {}).map(([key, value]) => (
+                <Descriptions.Item key={key} label={answerLabels[key] || key}>
+                  {String(value ?? '-')}
+                </Descriptions.Item>
+              ))}
+            </Descriptions>
           </>
         )}
       </Modal>

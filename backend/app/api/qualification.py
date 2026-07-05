@@ -244,12 +244,18 @@ async def get_questionnaire(
         raise HTTPException(status_code=403, detail="您未被邀请参与此评审项目")
 
     # 返回问卷模板
+    existing_answers = {}
+    if submission.questionnaire_answers:
+        existing_answers = json.loads(submission.questionnaire_answers)
+
     questionnaire = {
         "project_id": project.id,
         "project_name": project.project_name,
+        "project_notes": project.notes,
         "submission_id": submission.id,
         "deadline": project.deadline,
         "status": submission.status.value,
+        "existing_answers": existing_answers,
         "sections": [
             {
                 "id": "basic_info",
@@ -361,7 +367,12 @@ async def submit_questionnaire(
         project.status = QualificationStatus.IN_PROGRESS
 
     await db.flush()
-    return {"success": True, "message": "问卷提交成功，等待采购方评审", "submission_id": submission.id}
+    return {
+        "success": True,
+        "message": "问卷提交成功，等待采购方评审",
+        "submission_id": submission.id,
+        "status": submission.status.value,
+    }
 
 
 @router.get("/projects/{project_id}/submissions")

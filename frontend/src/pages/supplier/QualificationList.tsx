@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Tag, Button, Modal, Form, Input, Select, Card, Space, message, Descriptions, Collapse, InputNumber } from 'antd'
+import { Table, Tag, Button, Modal, Form, Input, Select, Card, Space, message, Descriptions, Collapse, InputNumber, Alert } from 'antd'
 import { FileTextOutlined, UploadOutlined, EyeOutlined } from '@ant-design/icons'
 import { getQualificationProjects, getQualificationProject, getQuestionnaire, submitQualification } from '../../api'
 
@@ -47,21 +47,18 @@ const SupplierQualification: React.FC = () => {
     try {
       const q = await getQuestionnaire(project.id, { params: { supplier_id: SUPPLIER_ID } }) as any
       setQuestionnaire(q)
-      const initialValues: Record<string, string> = {}
+      const initialValues: Record<string, unknown> = {}
       if (q?.sections && Array.isArray(q.sections)) {
         q.sections.forEach((section: any) => {
-          if (section.fields && Array.isArray(section.fields)) {
-            section.fields.forEach((field: any) => {
-              initialValues[field.id] = ''
-            })
-          }
+          section.fields?.forEach((field: any) => {
+            initialValues[field.id] = q.existing_answers?.[field.id] ?? undefined
+          })
         })
       }
       form.setFieldsValue(initialValues)
       setFillOpen(true)
     } catch {
-      setQuestionnaire(null)
-      setFillOpen(true)
+      message.error('无法加载问卷，请确认您已被邀请参与该项目')
     }
   }
 
@@ -69,11 +66,11 @@ const SupplierQualification: React.FC = () => {
     if (!currentProject) return
     try {
       const values = await form.validateFields()
-      await submitQualification(currentProject.id, {
+      const res = await submitQualification(currentProject.id, {
         supplier_id: SUPPLIER_ID,
         answers: values,
-      })
-      message.success('问卷已提交')
+      }) as any
+      message.success(res?.message || '问卷已提交')
       setFillOpen(false)
       form.resetFields()
       fetchData()
@@ -82,25 +79,6 @@ const SupplierQualification: React.FC = () => {
       message.error('提交失败')
     }
   }
-
-  const columns = [
-    { title: '项目名称', dataIndex: 'project_name', key: 'project_name' },
-    { title: '品类范围', dataIndex: 'target_categories', key: 'target_categories', ellipsis: true },
-    { title: '我的状态', dataIndex: 'my_status', key: 'my_status', render: (v: string, r: any) => {
-      const key = v || r.status
-      const s = projectStatusMap[key] || { color: 'default', text: key }
-      return <Tag color={s.color}>{s.text}</Tag>
-    }},
-    { title: '截止日期', dataIndex: 'deadline', key: 'deadline', render: (v: string) => v ? new Date(v).toLocaleDateString() : '-' },
-    { title: '操作', key: 'action', render: (_: any, r: any) => (
-      <Space>
-        <Button type="link" icon={<EyeOutlined />} size="small" onClick={() => handleView(r)}>查看</Button>
-        {(r.my_status === 'pending_response' || r.my_status === 'supplement_materials') && (
-          <Button type="primary" icon={<FileTextOutlined />} size="small" onClick={() => handleFill(r)}>填写问卷</Button>
-        )}
-      </Space>
-    )},
-  ]
 
   const renderField = (field: any) => {
     if (field.type === 'select') {
@@ -122,18 +100,45 @@ const SupplierQualification: React.FC = () => {
     }
     if (field.type === 'file') {
       return (
-        <div>
-          <Button icon={<UploadOutlined />}>上传文件</Button>
-          {field.note && <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>{field.note}</span>}
-        </div>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Button icon={<UploadOutlined />} onClick={() => form.setFieldValue(field.id, `${field.id}-demo.pdf`)}>
+            模拟上传
+          </Button>
+          {field.note && <span style={{ color: '#999', fontSize: 12 }}>{field.note}</span>}
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev[field.id] !== cur[field.id]}>
+            {() => {
+              const v = form.getFieldValue(field.id)
+              return v ? <Tag color="green">{String(v)}</Tag> : null
+            }}
+          </Form.Item>
+        </Space>
       )
     }
     return <Input placeholder={field.placeholder || '请输入'} />
   }
 
+  const columns = [
+    { title: '项目名称', dataIndex: 'project_name', key: 'project_name' },
+    { title: '品类范围', dataIndex: 'target_categories', key: 'target_categories', ellipsis: true },
+    { title: '我的状态', dataIndex: 'my_status', key: 'my_status', render: (v: string, r: any) => {
+      const key = v || r.status
+      const s = projectStatusMap[key] || { color: 'default', text: key }
+      return <Tag color={s.color}>{s.text}</Tag>
+    }},
+    { title: '截止日期', dataIndex: 'deadline', key: 'deadline', render: (v: string) => v ? new Date(v).toLocaleDateString() : '-' },
+    { title: '操作', key: 'action', render: (_: any, r: any) => (
+      <Space>
+        <Button type="link" icon={<EyeOutlined />} size="small" onClick={() => handleView(r)}>查看</Button>
+        {(r.my_status === 'pending_response' || r.my_status === 'supplement_materials') && (
+          <Button type="primary" icon={<FileTextOutlined />} size="small" onClick={() => handleFill(r)}>填写问卷</Button>
+        )}
+      </Space>
+    )},
+  ]
+
   return (
     <div>
-      <Card title="资格评审项目 (US-104-2)">
+      <Card title="资格评审 (US-104-2 / US-105-1)">
         <Table rowKey="id" dataSource={data} columns={columns} loading={loading} pagination={{ pageSize: 10 }} />
       </Card>
 
@@ -152,13 +157,16 @@ const SupplierQualification: React.FC = () => {
       </Modal>
 
       <Modal
-        title={`填写资格问卷 (US-105) - ${currentProject?.project_name || ''}`}
+        title={`填写资格问卷 (US-105-1) - ${currentProject?.project_name || ''}`}
         open={fillOpen}
         onOk={handleSubmit}
         onCancel={() => { setFillOpen(false); form.resetFields() }}
         width={720}
         okText="提交问卷"
       >
+        {questionnaire?.project_notes && (
+          <Alert type="info" showIcon message="采购方评审要求" description={questionnaire.project_notes} style={{ marginBottom: 16 }} />
+        )}
         <Form form={form} layout="vertical">
           {questionnaire?.sections && Array.isArray(questionnaire.sections) ? (
             <Collapse
@@ -179,22 +187,7 @@ const SupplierQualification: React.FC = () => {
               }))}
             />
           ) : (
-            <>
-              <Form.Item name="company_qualification" label="企业资质等级" rules={[{ required: true }]}>
-                <Select placeholder="请选择">
-                  <Select.Option value="AAA">AAA级</Select.Option>
-                  <Select.Option value="AA">AA级</Select.Option>
-                  <Select.Option value="A">A级</Select.Option>
-                  <Select.Option value="B">B级</Select.Option>
-                </Select>
-              </Form.Item>
-              <Form.Item name="quality_system" label="质量管理体系认证" rules={[{ required: true }]}>
-                <Input placeholder="如：ISO 9001, HACCP等" />
-              </Form.Item>
-              <Form.Item name="production_capacity" label="年产能（吨）" rules={[{ required: true }]}>
-                <Input type="number" placeholder="年产能" />
-              </Form.Item>
-            </>
+            <Alert type="warning" message="问卷加载失败" />
           )}
         </Form>
       </Modal>

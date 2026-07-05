@@ -124,7 +124,7 @@ export const getQuestionnaire = (projectId: number, config?: { params?: Record<s
 // US-105: 供应商填写问卷
 export const submitQualification = (projectId: number, data: {
   supplier_id: number
-  answers: Record<string, string>
+  answers: Record<string, unknown>
 }) => api.post(`/qualification/projects/${projectId}/submission`, data)
 
 export const getQualificationSubmissions = (projectId: number) =>

@@ -272,20 +272,64 @@ def test_us_104_2(client):
 
 def test_us_105_1(client):
     """供应商填写资格问卷"""
+    answers = {
+        "company_scale": "中型(200-500人)",
+        "registered_capital": 1000,
+        "annual_revenue": 5000,
+        "production_capacity": 1000,
+        "production_lines": 2,
+        "warehouse_capacity": 500,
+        "lead_time_days": 7,
+        "has_iso9001": "是",
+        "has_iso22000": "是",
+        "quality_score_self": 8,
+        "latest_revenue": 5000,
+        "latest_profit": 500,
+        "current_assets": 2000,
+        "current_liabilities": 800,
+        "has_tax_cert": "是",
+        "major_clients": "客户A,客户B,客户C",
+        "has_baijiu_exp": "是(详细说明)",
+        "quality_cert_files": "quality-cert-demo.pdf",
+    }
     r = client.post(
         f"/qualification/projects/{ST.qual_project_id}/submission",
-        json={
-            "supplier_id": 1,
-            "answers": {"production": {"production_capacity": 1000, "production_lines": 2}},
-        },
+        json={"supplier_id": 1, "answers": answers},
     )
     assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is True
+    assert body["submission_id"]
+    assert body["status"] == "in_progress"
+    ST.qual_submission_id = body["submission_id"]
+    q = client.get(
+        f"/qualification/projects/{ST.qual_project_id}/questionnaire",
+        params={"supplier_id": 1},
+    ).json()
+    assert q["existing_answers"]["production_capacity"] == 1000
+    status = client.get(
+        f"/qualification/projects/{ST.qual_project_id}/status",
+        params={"supplier_id": 1},
+    ).json()
+    assert status["status"] == "in_progress"
 
 
 def test_us_105_2(client):
     """采购方查看供应商提交"""
     r = client.get(f"/qualification/projects/{ST.qual_project_id}/submissions")
     assert r.status_code == 200
+    rows = r.json()
+    assert isinstance(rows, list)
+    match = next(s for s in rows if s["supplier_id"] == 1)
+    assert match["has_answers"] is True
+    assert match["status"] == "in_progress"
+    detail = client.get(
+        f"/qualification/projects/{ST.qual_project_id}/submissions/1"
+    ).json()
+    assert detail["supplier_id"] == 1
+    assert detail["answers"]["production_capacity"] == 1000
+    assert detail["answers"]["production_lines"] == 2
+    assert detail["answers"]["quality_cert_files"] == "quality-cert-demo.pdf"
 
 
 def test_us_106_1(client):
