@@ -17,7 +17,7 @@
 - [x] Phase 3 执行闭环：`US-301-1 ~ US-310-2` ✅ P0 已落地（见下方「Phase 3 P0 修复反馈」）
 - [x] Phase 4 财务闭环：`US-401-1 ~ US-405-2` ✅ commit `b2411b8`（待本地 pytest 验证）
 - [x] US-501 公告闭环：`US-501-1 ~ US-501-2` ✅ commit `b3edb89`
-- [ ] 全量 US 回归验收（待本地 pytest 环境就绪后执行）
+- [ ] 全量 US 回归验收 → 见 [FULL-REGRESSION-CHECKLIST.md](./FULL-REGRESSION-CHECKLIST.md)
 
 ## 当前修复优先级
 
@@ -77,47 +77,93 @@ pytest tests/api/test_user_stories_smoke.py -v -k "test_us_30"
 ### US-101 邀请注册
 
 - [x] `US-101-1` 供应商注册邀请
+
+| 维度 | 内容 |
+|------|------|
+| **角色** | 采购方 |
+| **输入** | `invited_supplier_name`(必填), `invited_email`(必填,email格式), `invited_contact_person`(选填), `expiry_days`(必填,1~90), `notes`(选填) |
+| **输出** | `invitation_code`(8位), `status: "pending"`, `expiry_date`, 注册链接 |
+| **状态流转** | pending → accepted(供应商注册后) \| cancelled(采购方取消) \| expired(超期) |
+| **异常** | 400: 邮箱格式非法; 400: 同一邮箱已有pending邀请 |
+| **验收** | status=200; invitation_code长度=8; status=pending; expiry_date非空; 可在列表查询 |
+| **API** | `POST /supplier-portal/invitations` → `supplier_qualification.py:32` |
+| **前端** | `buyer/InvitationList.tsx` — 表单+列表+成功弹窗(含复制链接) |
+| **测试** | `test_us_101_1` (创建+字段断言) ✅ |
+
 - [x] `US-101-2` 查看注册邀请
+
+| 维度 | 内容 |
+|------|------|
+| **角色** | 供应商 |
+| **输入** | `email`(Query参数, 用于筛选该邮箱收到的邀请) |
+| **输出** | 邀请列表 `[{invitation_code, invited_email, invited_supplier_name, status, expiry_date, ...}]` |
+| **验收** | status=200; 返回列表含刚创建的邀请; invitation_code匹配; status=pending |
+| **API** | `GET /supplier-portal/invitations?email=xxx` → `supplier_qualification.py` |
+| **前端** | `supplier/InvitationList.tsx` — 供应商端查看收到的邀请 |
+| **测试** | `test_us_101_2` (列表查询+字段匹配) ✅ |
 
 ### US-102 注册提交
 
 - [x] `US-102-1` 供应商自助注册
+
+| 维度 | 内容 |
+|------|------|
+| **角色** | 供应商 |
+| **输入** | `invitation_code`(选填,有则校验), `company_name`, `unified_credit_code`(唯一), `contact_person`, `contact_phone`, `contact_email`, `address`, `main_categories`, `annual_capacity`, `employee_count`, `established_year` |
+| **输出** | `id`, `status: "pending_audit"` |
+| **状态流转** | pending_audit → approved \| rejected; 邀请码状态 pending→accepted |
+| **异常** | 400: 统一信用代码已注册; 400: 邀请码无效/已失效/已过期 |
+| **验收** | status=200; 返回status=pending_audit; 邀请码关联的邀请变为accepted |
+| **API** | `POST /supplier-portal/register` → `supplier_qualification.py:219` |
+| **前端** | `supplier/Registration.tsx` — 自助注册表单 |
+| **测试** | `test_us_102_1` (注册+邀请状态联动) ✅ |
+| **注意** | ⚠️ 仅 `flush()` 无显式 `commit()`，依赖 `get_db()` 自动提交 |
+
 - [x] `US-102-2` 采购方查看供应商注册
+
+| 维度 | 内容 |
+|------|------|
+| **角色** | 采购方 |
+| **输入** | `registration_id`(路径参数) |
+| **输出** | 注册详情 `{company_name, unified_credit_code, status, ...}` |
+| **验收** | status=200; company_name/unified_credit_code匹配 |
+| **API** | `GET /supplier-portal/registrations/{id}` → `supplier_qualification.py` |
+| **测试** | `test_us_102_2` (详情查询+字段匹配) ✅ |
 
 ### US-103 注册审批
 
-- [x] `US-103-1` 审批供应商注册
-- [x] `US-103-2` 注册状态审批情况查询和回应
+- [x] `US-103-1` 审批供应商注册 — API `POST /supplier-portal/registrations/{id}/audit` (approve/reject) → `supplier_qualification.py:397` | 前端 `buyer/RegistrationAudit.tsx` | 测试 `test_us_103_1` ✅
+- [x] `US-103-2` 注册状态审批情况查询和回应 — API `GET /supplier-portal/register/status?unified_credit_code=` + `POST /supplier-portal/registrations/{id}/resubmit` | 测试 `test_us_103_2` ✅
 
 ### US-104 资格评审项目创建
 
-- [x] `US-104-1` 供应商资格评审项目创建
-- [x] `US-104-2` 接收供应商资格评审项目
+- [x] `US-104-1` 供应商资格评审项目创建 — API `POST /qualification/projects` → `qualification.py:52` | 前端 `buyer/QualificationProjectList.tsx` | 测试 `test_us_104_1` ✅
+- [x] `US-104-2` 接收供应商资格评审项目 — API `GET /qualification/projects` | 前端 `supplier/QualificationList.tsx` | 测试 `test_us_104_2` ✅
 
 ### US-105 资格评审填写与查看
 
-- [x] `US-105-1` 编辑供应商资格评审项目
-- [x] `US-105-2` 查看供应商资格评审项目
+- [x] `US-105-1` 编辑供应商资格评审项目 — API `GET /qualification/projects/{id}/questionnaire` + `POST .../submission` → `qualification.py:324` | 测试 `test_us_105_1` ✅
+- [x] `US-105-2` 查看供应商资格评审项目 — API `GET /qualification/projects/{id}/submissions` | 测试 `test_us_105_2` ✅
 
 ### US-106 资格文件评审与澄清
 
-- [x] `US-106-1` 采购方评审资格文件
-- [x] `US-106-2` 查看评审项目的审批结果
+- [x] `US-106-1` 采购方评审资格文件 — API `POST /qualification/projects/{id}/submissions/{sid}/review` → `qualification.py:451` | 测试 `test_us_106_1` ✅
+- [x] `US-106-2` 查看评审项目的审批结果 — API 同上 GET | 前端 `supplier/QualificationList.tsx` | 测试 `test_us_106_2` ✅
 
 ### US-107 最终资格决定
 
-- [x] `US-107-1` 最终决定-供应商资格评审项目
-- [x] `US-107-2` 查看最终决定-供应商资格评审项目
+- [x] `US-107-1` 最终决定-供应商资格评审项目 — API `POST /qualification/projects/{id}/approve|reject` → `qualification.py:526,579` | 测试 `test_us_107_1` ✅
+- [x] `US-107-2` 查看最终决定-供应商资格评审项目 — API 同上 GET | 测试 `test_us_107_2` ✅
 
 ### US-108 资质预警与重认证邀请
 
-- [x] `US-108-1` 采购方资质管理
-- [x] `US-108-2` 供应商资质管理
+- [x] `US-108-1` 采购方资质管理 — API `POST /supplier-portal/cert-alerts/check` + `GET .../supplier-alerts` + `POST .../{id}/resolve` → `supplier_qualification.py:83,554,617` | 前端 `buyer/CertAlertList.tsx` | 测试 `test_us_108_1` ✅
+- [x] `US-108-2` 供应商资质管理 — API 同上 GET/POST | 前端 `supplier/CertificationList.tsx` | 测试 `test_us_108_2` ✅
 
 ### US-109 资质更新
 
-- [x] `US-109-1` 供应商资质更新、资质有效期更新、提交重认证材料
-- [x] `US-109-2` 查看供应商资质更新记录、查看资质有效期更新记录、查看供应商提交的认证材料
+- [x] `US-109-1` 供应商资质更新、资质有效期更新、提交重认证材料 — API `POST /supplier-portal/suppliers/{id}/certifications` → `supplier_qualification.py:510` | 测试 `test_us_109_1` ✅
+- [x] `US-109-2` 查看供应商资质更新记录 — API `GET /supplier-portal/suppliers/{id}/certifications` | 测试 `test_us_109_2` ✅
 
 ---
 
@@ -125,43 +171,43 @@ pytest tests/api/test_user_stories_smoke.py -v -k "test_us_30"
 
 ### US-201 寻源项目发布与查看
 
-- [x] `US-201-1` 寻源项目发布
-- [x] `US-201-2` 查看寻源项目
+- [x] `US-201-1` 寻源项目发布 — API `POST /sourcing/projects` → `sourcing.py:75` | 前端 `buyer/SourcingList.tsx` | 测试 `test_us_201_1` ✅
+- [x] `US-201-2` 查看寻源项目 — API `GET /sourcing/projects` + `GET /sourcing/projects/{id}` | 前端 `supplier/InvitationList.tsx` | 测试 `test_us_201_2` ✅
 
 ### US-202 邀请响应
 
-- [x] `US-202-1` 接收/拒绝寻源项目
-- [x] `US-202-2` 查收供应商对寻源项目邀请的接收/拒绝信息
+- [x] `US-202-1` 接收/拒绝寻源项目 — API `POST /sourcing/projects/{id}/accept|decline` → `sourcing.py:292,316` | 前端 `supplier/InvitationList.tsx` | 测试 `test_us_202_1` ✅
+- [x] `US-202-2` 查收邀请接收/拒绝信息 — API `GET /sourcing/projects/{id}/invitations` | 测试 `test_us_202_2` ✅
 
 ### US-203 寻源结果通知
 
-- [x] `US-203-1` 中标/落标通知发布
-- [x] `US-203-2` 查收中标/落标通知
+- [x] `US-203-1` 中标/落标通知发布 — API `POST /sourcing/projects/{id}/open-bids` + `POST .../award` → `sourcing.py:452,553` | 测试 `test_us_203_1` ✅
+- [x] `US-203-2` 查收中标/落标通知 — API `GET /sourcing/projects/{id}/bids/{bid_id}` | 测试 `test_us_203_2` ✅
 
 ### US-204 合同草案发布与查看
 
-- [x] `US-204-1` 合同草案发布
-- [x] `US-204-2` 查询合同草案
+- [x] `US-204-1` 合同草案发布 — API `POST /contracts/` (generate from sourcing) → `sourcing.py:672` | 前端 `buyer/ContractList.tsx` | 测试 `test_us_204_1` ✅
+- [x] `US-204-2` 查询合同草案 — API `GET /contracts/` + `GET /contracts/drafts/{id}` | 前端 `supplier/ContractList.tsx` | 测试 `test_us_204_2` ✅
 
 ### US-205 合同修改意见
 
-- [x] `US-205-1` 合同修改意见反馈
-- [x] `US-205-2` 查看供应商的合同修改意见
+- [x] `US-205-1` 合同修改意见反馈 — API `POST /contracts/{id}/comments` → `sourcing.py:849` | 测试 `test_us_205_1` ✅
+- [x] `US-205-2` 查看供应商的合同修改意见 — API `GET /contracts/{id}` (含comments) | 测试 `test_us_205_2` ✅
 
 ### US-206 合同在线签署
 
-- [x] `US-206-1` 发起合同在线签署
-- [x] `US-206-2` 在线签署合同
+- [x] `US-206-1` 发起合同在线签署 — API `POST /contracts/{id}/sign-initiate` → `sourcing.py:1016` | 测试 `test_us_206_1` ✅
+- [x] `US-206-2` 在线签署合同 — API `POST /contracts/{id}/sign` → `sourcing.py:1043` | 测试 `test_us_206_2` ✅
 
 ### US-207 查看签署状态
 
-- [x] `US-207-1` 查看合同签署状态（供应商）
-- [x] `US-207-2` 查看合同签署状态（采购方）
+- [x] `US-207-1` 查看合同签署状态（供应商） — API `GET /contracts/{id}/sign-status` | 测试 `test_us_207_1` ✅
+- [x] `US-207-2` 查看合同签署状态（采购方） — API 同上 | 测试 `test_us_207_2` ✅
 
 ### US-208 合同状态修改
 
-- [x] `US-208-1` 修改合同状态
-- [x] `US-208-2` 查看合同状态的修改
+- [x] `US-208-1` 修改合同状态 — API `PATCH /contracts/{id}` → `sourcing.py:821` | 测试 `test_us_208_1` ✅
+- [x] `US-208-2` 查看合同状态的修改 — API `GET /contracts/{id}` | 测试 `test_us_208_2` ✅
 
 ---
 
@@ -302,9 +348,25 @@ pytest tests/api/test_user_stories_smoke.py -v -k "test_us_501"
 
 ### 后续建议
 
-1. **立即**：`pytest tests/api/test_user_stories_smoke.py -v` 全量串行回归（需本地 Python + 后端 8000）
-2. **可选**：`.\scripts\run-us-tests.ps1 -Fresh` 干净库重跑
-3. **文档**：README「全量 US 全部通过」在 pytest 绿后再改回
+1. **立即**：按 [FULL-REGRESSION-CHECKLIST.md](./FULL-REGRESSION-CHECKLIST.md) 执行全量 67 条烟测
+2. **推荐命令**：`.\scripts\run-us-tests.ps1 -Fresh` 或本地 `pytest tests/api/test_user_stories_smoke.py -v --tb=short`
+3. **通过后**：勾选 RALPH-TODO「全量 US 回归验收」，更新 README「全量 US 全部通过」
+
+---
+
+## 全量回归检查清单
+
+完整矩阵、分 Phase 勾选表、环境命令与故障排查见 **[docs/FULL-REGRESSION-CHECKLIST.md](./FULL-REGRESSION-CHECKLIST.md)**。
+
+| Phase | 用例数 | 快速命令 |
+|-------|--------|----------|
+| Health | 1 | `pytest ... -k test_health` |
+| Phase 1 | 18 | `pytest ... -k "test_us_10"` |
+| Phase 2 | 16 | `pytest ... -k "test_us_20"` |
+| Phase 3 | 20 | `pytest ... -k "test_us_30"` |
+| Phase 4 | 10 | `pytest ... -k "test_us_40"` |
+| US-501 | 2 | `pytest ... -k "test_us_501"` |
+| **合计** | **67** | 全量无 `-k` 过滤 |
 
 ---
 
