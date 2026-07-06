@@ -8,7 +8,7 @@ export class BasePage {
   protected page: Page;
   protected baseURL: string;
 
-  constructor(page: Page, baseURL: string = 'http://localhost:3000') {
+  constructor(page: Page, baseURL: string = 'http://localhost:5000') {
     this.page = page;
     this.baseURL = baseURL;
   }
@@ -18,7 +18,7 @@ export class BasePage {
    */
   async navigate(path: string): Promise<void> {
     await this.page.goto(new URL(path, this.baseURL).toString(), {
-      waitUntil: 'networkidle'
+      waitUntil: 'domcontentloaded'
     });
   }
 
@@ -198,7 +198,7 @@ export class BasePage {
    */
   async waitForLoading(timeout: number = 30000): Promise<void> {
     try {
-      await this.page.waitForSelector('.ant-spin, [class*="loading"]', { state: 'hidden', timeout });
+      await this.page.waitForSelector('.ant-spin-spinning', { state: 'hidden', timeout: 5000 });
     } catch {
       // loading可能不存在，忽略
     }

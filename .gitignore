@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 __pycache__/
 *.pyc
@@ -39,6 +39,7 @@ npm-debug.log*
 
 # Test
 coverage/
+.coverage
 htmlcov/
 .pytest_cache/
 playwright-report/
@@ -48,3 +49,8 @@ test-results/
 *.tmp
 *.temp
 .cache/
+
+# Preview files
+.preview
+.cozeproj/reduction
+.codegraph

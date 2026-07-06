@@ -11,6 +11,7 @@ const PurchaseOrderList: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [stats, setStats] = useState<any>(null)
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   useEffect(() => { loadOrders() }, [page])
   useEffect(() => { getOrderStats().then(setStats) }, [])
@@ -53,10 +54,10 @@ const PurchaseOrderList: React.FC = () => {
         <Col span={4}><Card bordered={false} size="small"><Statistic title="总金额" value={stats?.total_amount || 0} prefix="¥" loading={loading} /></Card></Col>
       </Row>
       <Card bordered={false} size="small" style={{ marginBottom: 16 }}>
-        <Space><Input placeholder="搜索订单编号" prefix={<SearchOutlined />} style={{ width: 160 }} /><Button type="primary">查询</Button><Button>重置</Button><Button type="primary" icon={<PlusOutlined />}>新建订单</Button></Space>
+        <Space><Input placeholder="搜索订单编号" prefix={<SearchOutlined />} style={{ width: 160 }} value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} /><Button type="primary" onClick={() => {}}>查询</Button><Button onClick={() => setSearchKeyword('')}>重置</Button><Button type="primary" icon={<PlusOutlined />}>新建订单</Button></Space>
       </Card>
       <Card bordered={false} size="small">
-        <Table columns={columns} dataSource={orders} rowKey="id" loading={loading} pagination={{ current: page, pageSize: 20, total, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条`, onChange: (p) => setPage(p) }} />
+        <Table columns={columns} dataSource={orders.filter(item => !searchKeyword || item.order_no?.toLowerCase().includes(searchKeyword.toLowerCase()))} rowKey="id" loading={loading} pagination={{ current: page, pageSize: 20, total, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条`, onChange: (p) => setPage(p) }} />
       </Card>
     </div>
   )

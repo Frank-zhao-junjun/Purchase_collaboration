@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 test.describe('简单冒烟测试', () => {
   test('首页可以访问', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/白酒供应链/);
+    await expect(page).toHaveTitle(/采购供应链/);
   });
 
   test('API健康检查', async ({ page }) => {
-    const response = await page.request.get('http://localhost:8080/health');
+    const response = await page.request.get('http://localhost:8000/health');
     expect(response.ok()).toBeTruthy();
   });
 

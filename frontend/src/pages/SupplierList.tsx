@@ -8,6 +8,7 @@ const SupplierList: React.FC = () => {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any>(null)
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   useEffect(() => { loadData() }, [])
   const loadData = async () => {
@@ -48,10 +49,10 @@ const SupplierList: React.FC = () => {
         <Col span={6}><Card bordered={false} size="small"><Statistic title="已暂停" value={stats?.suspended || 0} valueStyle={{ color: '#FF4D4F' }} /></Card></Col>
       </Row>
       <Card bordered={false} size="small" style={{ marginBottom: 16 }}>
-        <Space><Input placeholder="搜索供应商名称" prefix={<SearchOutlined />} style={{ width: 160 }} /><Button type="primary">查询</Button><Button>重置</Button><Button type="primary" icon={<PlusOutlined />}>新增供应商</Button></Space>
+        <Space><Input placeholder="搜索供应商名称" prefix={<SearchOutlined />} style={{ width: 160 }} value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} /><Button type="primary" onClick={() => {}}>查询</Button><Button onClick={() => setSearchKeyword('')}>重置</Button><Button type="primary" icon={<PlusOutlined />}>新增供应商</Button></Space>
       </Card>
       <Card bordered={false} size="small">
-        <Table columns={columns} dataSource={suppliers} rowKey="id" loading={loading} pagination={{ total, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }} />
+        <Table columns={columns} dataSource={suppliers.filter(item => !searchKeyword || item.name?.toLowerCase().includes(searchKeyword.toLowerCase()) || item.contact_person?.toLowerCase().includes(searchKeyword.toLowerCase()))} rowKey="id" loading={loading} pagination={{ total, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }} />
       </Card>
     </div>
   )

@@ -9,6 +9,7 @@ const InventoryList: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('原料库存')
   const [stats, setStats] = useState<any>(null)
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   useEffect(() => { loadData() }, [])
   const loadData = async () => {
@@ -55,10 +56,10 @@ const InventoryList: React.FC = () => {
         <Col span={6}><Card bordered={false} size="small"><Statistic title="预警" value={stats?.warning_count || 0} valueStyle={{ color: '#FAAD14' }} /></Card></Col>
       </Row>
       <Card bordered={false} size="small" style={{ marginBottom: 16 }}>
-        <Space><Input placeholder="搜索物料名称" prefix={<SearchOutlined />} style={{ width: 160 }} /><Button type="primary">查询</Button><Button>重置</Button></Space>
+        <Space><Input placeholder="搜索物料名称" prefix={<SearchOutlined />} style={{ width: 160 }} value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} /><Button type="primary" onClick={() => {}}>查询</Button><Button onClick={() => setSearchKeyword('')}>重置</Button></Space>
       </Card>
       <Card bordered={false} size="small">
-        <Table columns={columns} dataSource={inventory} rowKey="id" loading={loading} pagination={{ total, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }} />
+        <Table columns={columns} dataSource={inventory.filter(item => !searchKeyword || item.name?.toLowerCase().includes(searchKeyword.toLowerCase()) || item.category?.toLowerCase().includes(searchKeyword.toLowerCase()))} rowKey="id" loading={loading} pagination={{ total, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }} />
       </Card>
     </div>
   )
