@@ -7,6 +7,7 @@ from app.config import settings
 from app.integration.client import SapAuthorizationError, SapClient, SapClientSettings, SapHttpError
 from app.integration.endpoints import SAP_ENDPOINTS
 from app.integration.probe_service import probe_all, save_results, load_results
+from app.integration.read_service import SapReadService
 
 router = APIRouter(prefix="/integration/sap", tags=["SAP集成"])
 
@@ -20,6 +21,10 @@ def get_sap_client() -> SapClient:
         credentials_file=settings.SAP_CREDENTIALS_FILE,
     )
     return SapClient(settings=sap_settings)
+
+
+def get_sap_read_service(client: SapClient = Depends(get_sap_client)) -> SapReadService:
+    return SapReadService(client)
 
 
 @router.get("/endpoints")
@@ -100,3 +105,17 @@ async def get_probe_results():
     if data is None:
         raise HTTPException(status_code=404, detail="No probe results found. Run POST /integration/sap/probe first.")
     return data
+
+
+@router.get("/resources/{resource_name}")
+async def list_sap_resource(
+    resource_name: str,
+    top: int = 50,
+    service: SapReadService = Depends(get_sap_read_service),
+):
+    try:
+        items = service.list_resource(resource_name, top=top)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="SAP resource not found") from exc
+
+    return {"resource": resource_name, "count": len(items), "items": items}
