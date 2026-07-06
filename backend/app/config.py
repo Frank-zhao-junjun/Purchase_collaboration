@@ -1,11 +1,14 @@
 """
 Application configuration settings
 """
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+
     APP_NAME: str = "白酒供应链数字化管控平台"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
@@ -23,10 +26,6 @@ class Settings(BaseSettings):
     SAP_COMM_PASSWORD: str = ""
     SAP_CREDENTIALS_FILE: str = ""
     SAP_PROBE_RESULTS_FILE: str = "Integration/probe-latest.json"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 @lru_cache()
