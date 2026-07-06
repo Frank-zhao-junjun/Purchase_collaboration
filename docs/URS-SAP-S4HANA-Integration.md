@@ -1,8 +1,8 @@
-# URS — SAP S/4HANA ERP 集成层用户需求规格说明书
+# URS — SAP S/4HANA Cloud Public Edition 集成层用户需求规格说明书
 
 | 版本信息 | |
 |---|---|
-| 文档版本 | V0.1 (Draft) |
+| 文档版本 | V0.3 (Draft) |
 | 创建日期 | 2026-07-05 |
 | 文档状态 | 初稿，待评审 |
 | 基于文档 | PRD V1.0、AGENTS.md US 矩阵、技术架构设计 V1.0 |
@@ -31,7 +31,7 @@
 
 ### 1.1 文档目的
 
-本文档定义「白酒供应链数字化管控平台」与 **SAP S/4HANA ERP** 之间集成层的用户需求规格（URS），作为后续技术设计（FDS）和开发实现的依据。
+本文档定义「白酒供应链数字化管控平台」与 **SAP S/4HANA Cloud Public Edition** 之间集成层的用户需求规格（URS），作为后续技术设计（FDS）和开发实现的依据。
 
 ### 1.2 范围
 
@@ -92,7 +92,7 @@
 ### 3.3 设计原则
 
 1. **平台不写回 ERP 业务数据** — 平台是协同门户，不做 ERP 的数据录入入口；出站仅回传"供应商协同结果"（如确认/拒绝、ASN、结算单）
-2. **入站优先 OData** — S/4HANA 标准 OData 服务优先，RFC/BAPI 仅在 OData 不可用时使用
+2. **入站优先 OData** — S/4HANA Cloud Public Edition 仅支持 OData/SOAP 公开 API，不使用 RFC/BAPI（SAP Note 2447593）
 3. **幂等设计** — 所有同步操作幂等，重复推送不产生副作用
 4. **松耦合** — 集成层与业务层通过内部消息总线解耦，ERP 协议变更不影响业务逻辑
 
@@ -124,8 +124,8 @@
 │  ┌────────────────────────┴────────────────────────────────────────┐   │
 │  │                    Integration Gateway                           │   │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐   │   │
-│  │  │ OData    │  │ RFC/BAPI │  │ IDoc     │  │ Webhook 端点   │   │   │
-│  │  │ Client   │  │ Client   │  │ Listener │  │ (接收ERP推送)  │   │   │
+│  │  │ OData    │  │ SOAP     │  │ OAuth2   │  │ Webhook 端点   │   │   │
+│  │  │ Client   │  │ Client   │  │ Client   │  │ (接收ERP推送)  │   │   │
 │  │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───────┬───────┘   │   │
 │  └───────┼─────────────┼─────────────┼────────────────┼───────────┘   │
 │          └─────────────┼─────────────┼────────────────┘               │
@@ -436,13 +436,13 @@
 |------|------|
 | **关联 US** | US-303 |
 | **平台触发事件** | 供应商在平台确认/拒绝/提出异议采购订单 |
-| **SAP 接口** | RFC: `BAPI_PO_CHANGE`（设置确认状态）或 OData 更新 |
+| **SAP 接口** | OData V4 **PATCH** `api_purchaseorder_2/PurchaseOrder`（SAP_COM_0053，更新供应商确认字段）。> 公有云不适用 RFC `BAPI_PO_CHANGE`（本地部署方案），改用 OData 写操作 |
 | **回传数据** | 平台订单号、SAP 订单号、供应商确认状态、确认交货日期、拒绝原因、异议说明 |
 
 **业务规则：**
 
-1. 供应商确认订单：回传确认标记到 SAP PO 的供应商确认字段（EKPO-CONFIRMED）
-2. 供应商拒绝订单：在 SAP PO 中创建供应商确认记录，状态为"拒绝"，附拒绝原因
+1. 供应商确认订单：回传确认标记到 SAP PO 的供应商确认字段（通过 OData PATCH 更新 PurchaseOrder entity）
+2. 供应商拒绝订单：通过 OData PATCH 更新 PurchaseOrder，状态为"拒绝"，附拒绝原因
 3. 供应商提出异议：在 SAP PO 备注字段记录异议内容，通知采购员在 ERP 中处理
 4. 回传失败时平台保留待发送队列，自动重试 3 次，仍失败则告警人工介入
 
@@ -471,15 +471,15 @@
 |------|------|
 | **关联 US** | US-403 |
 | **平台触发事件** | 采购方在平台审批通过供应商提交的发票 |
-| **SAP 接口** | RFC: `BAPI_INCOMINGINVOICE_CREATE`（MIRO 过账） |
+| **SAP 接口** | OData V2 **POST** `API_SUPPLIERINVOICE_PROCESS_SRV/A_SupplierInvoice`（创建发票校验，等价 MIRO 过账）。> 公有云不适用 RFC `BAPI_INCOMINGINVOICE_CREATE`（本地部署方案），改用 OData 写操作 |
 | **回传数据** | 供应商、发票号、发票日期、金额、税额、采购订单号、收货凭证号、行项目明细 |
 
 **业务规则：**
 
-1. 平台发票审批通过后，自动调用 BAPI 在 SAP 中创建发票校验凭证
+1. 平台发票审批通过后，自动调用 OData POST 在 SAP 中创建发票校验凭证（`A_SupplierInvoice`）
 2. 三单匹配结果（PO/GR/Invoice）随发票一并传入 SAP，作为 MIRO 的参考
-3. SAP MIRO 成功后返回发票校验凭证号，平台记录关联
-4. SAP MIRO 失败时（如金额不匹配），平台标记发票为"回传失败"，附带 SAP 错误消息，通知采购方人工处理
+3. SAP 创建成功后返回发票校验凭证号（SupplierInvoice + FiscalYear），平台记录关联
+4. SAP 创建失败时（如金额不匹配，返回 OData 错误响应），平台标记发票为"回传失败"，附带 SAP 错误消息，通知采购方人工处理
 5. 同一发票号不可重复过账（幂等校验）
 
 ---
@@ -653,25 +653,43 @@
 
 ### 12.1 OData 服务清单
 
-| 场景 | OData 服务名 | SAP CDS View | 操作 |
-|------|-------------|-------------|------|
-| INT-01 | API_PLANNED_ORDERS | I_PlannedOrder | READ |
-| INT-02 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrder | READ |
-| INT-04 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrder | READ (变更版本) |
-| INT-05 | API_PURCHASING_SCHEDULE_AGREEMENT_SRV | I_PurchasingSchedgAgrmt | READ |
-| INT-07 | API_MATERIAL_DOCUMENT_SRV | I_MaterialDocument | READ |
-| INT-08 | API_INSPECTIONLOT_SRV | I_InspectionLot | READ |
-| INT-09 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrderHistory | READ |
-| INT-12 | API_JOURNALENTRY_SRV | I_JournalEntry | READ |
-| INT-13 | API_BUSINESS_PARTNER | I_BusinessPartner | READ |
-| INT-15 | API_PRODUCT_SRV | I_Product | READ |
+> 核对状态截至 2026-07-06，基于 SAP API Business Hub (api.sap.com) 公开文档验证。
 
-### 12.2 RFC/BAPI 清单
+| 场景 | OData 服务名 | SAP CDS View | 操作 | 核对状态 | 备注 |
+|------|-------------|-------------|------|---------|------|
+| INT-01 | API_PLANNED_ORDERS | I_PlannedOrder | READ | ✅ 已确认 | 路径 `/sap/opu/odata/sap/API_PLANNED_ORDERS`，OData v2，sandbox 端点活跃 |
+| INT-02 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrder | READ | ⚠️ 已废弃 | SAP 标注 "now deprecated"，v4 替代：`API_PURCHASE_ORDER_2`，路径 `/sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/` |
+| INT-04 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrder | READ (变更版本) | ⚠️ 已废弃 | 同 INT-02，建议迁移至 `API_PURCHASE_ORDER_2` (v4) |
+| INT-05 | API_PURCHASING_SCHEDULE_AGREEMENT_SRV | I_PurchasingSchedgAgrmt | READ | ✅ 已确认 | RAP 业务对象 `i_schedgagrmthdrtp_2` 活跃（SAP KBA 3708479, 2026-01），OData v2 |
+| INT-07 | API_MATERIAL_DOCUMENT_SRV | I_MaterialDocument | READ | ✅ 已确认 | 路径 `/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV`，通信场景 SAP_COM_0108，SAP Build Process Automation 模板活跃使用 |
+| INT-08 | API_INSPECTIONLOT_SRV | I_InspectionLot | READ | ✅ 已确认 | 适用 SAP S/4HANA 2022+，范围项 1FM（采购质量管理），OData v2 |
+| INT-09 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrderHistory | READ | ⚠️ 已废弃 | 同 INT-02，采购订单历史读取也需迁移至 `API_PURCHASE_ORDER_2` (v4) |
+| INT-12 | API_JOURNALENTRY_SRV | I_JournalEntry | READ | ✅ 已确认 | OData API 支持读取日记账行项目；注意：创建日记账使用 SOAP API (`JournalEntryBulkCreateRequest`)，非 OData |
+| INT-13 | API_BUSINESS_PARTNER | I_BusinessPartner | READ | ✅ 已确认 | 路径 `/sap/opu/odata/sap/API_BUSINESS_PARTNER`，通信场景 SAP_COM_0008 |
+| INT-15 | API_PRODUCT_SRV | I_Product | READ | ✅ 已确认 | 路径 `/sap/opu/odata/sap/API_PRODUCT_SRV`，通信场景 SAP_COM_0009，SAP Build Process Automation 模板活跃使用 |
 
-| 场景 | 函数模块 | 事务码 | 操作 |
-|------|---------|--------|------|
-| INT-03 | BAPI_PO_CHANGE | ME22N | UPDATE（确认字段） |
-| INT-11 | BAPI_INCOMINGINVOICE_CREATE | MIRO | CREATE（发票校验） |
+**v2 → v4 迁移说明**：SAP 正在将 API 从 OData v2 (`/sap/opu/odata/sap/`) 迁移至 v4 (`/sap/opu/odata4/sap/`)。INT-02/INT-04/INT-09 所用的 `API_PURCHASEORDER_PROCESS_SRV` 已被标注废弃，实现时应直接采用 v4 版本 `API_PURCHASE_ORDER_2`。其余 v2 服务（INT-01/05/07/08/12/15）目前仍为当前版本，尚未有 v4 替代。
+
+### 12.2 OData/SOAP API 清单（替代原 RFC/BAPI）
+
+> **重要**：目标系统为 SAP S/4HANA Cloud Public Edition，BAPI/RFC 不可用于外部系统集成（SAP Note 2447593）。原 INT-03/INT-11 的 BAPI 方案已替换为 OData/SOAP API。核对状态截至 2026-07-06。
+
+| 场景 | 原 BAPI（已废弃） | 替代 API | 协议 | 操作 | 通信场景 | 核对状态 | 备注 |
+|------|-------------------|---------|------|------|---------|---------|------|
+| INT-03 | BAPI_PO_CHANGE | `API_PURCHASE_ORDER_2` (PATCH) + Supplier Confirmation OData V4 | OData v4 | UPDATE | SAP_COM_0053 | ✅ 已确认 | PO 更新仅支持 NB 类型（KBA 3555741）；供应商确认使用 CDS `I_POSupplierConfirmationAPI01`（KBA 3401990），不支持批量 |
+| INT-11 | BAPI_INCOMINGINVOICE_CREATE | `API_SUPPLIERINVOICE_PROCESS_SRV` | OData v2 | CREATE / READ / RELEASE / REVERSE | SAP_COM_0057 | ✅ 已确认 | 内部封装 BAPI_INCOMINGINVOICE_CREATE（KBA 3377659），为官方 Cloud API。已知限制：Profit Center / Functional Area 需显式传入；替代统账科目需 SSCUI 102631 配置 |
+
+**SOAP 替代接口（可选）**：
+
+| 场景 | SOAP 服务名 | 说明 |
+|------|------------|------|
+| INT-03 | `OrderConfirmationRequest_In` | 采购订单确认 SOAP 接口（范围项 2EJ） |
+| INT-11 | `SupplierInvoiceERPCreateRequestConfirmation_In` (`ECC_SUPLRINVCERPCRTRC`) | 供应商发票创建 SOAP 接口，支持过账/暂存/暂存完成/录入并保持 |
+
+**Public Cloud 集成配置要求**：
+- 所有 API 调用须通过 Fiori 应用 "Communication Arrangements" 配置通信场景
+- 认证方式：OAuth 2.0（推荐）或 Basic Auth
+- 调用流程：先通过 `https://{host}/oauth/token` 获取 access_token → 以 Bearer token 调用 OData API
 
 ### 12.3 字段映射示例（INT-02 采购订单）
 
@@ -697,3 +715,5 @@
 | 日期 | 版本 | 变更内容 | 变更人 |
 |------|------|---------|--------|
 | 2026-07-05 | V0.1 | 初稿创建，包含 15 个集成场景 + 6 个管理需求 + 非功能需求 | Agent |
+| 2026-07-06 | V0.2 | 附录 12.1/12.2 API 核对：标注 `API_PURCHASEORDER_PROCESS_SRV` 已废弃并推荐 v4 替代 `API_PURCHASE_ORDER_2`；补充通信场景映射；添加 BAPI 部署环境注意事项 | Agent |
+| 2026-07-06 | V0.3 | 标注目标系统为 S/4HANA Cloud Public Edition；INT-03 BAPI_PO_CHANGE 替换为 `API_PURCHASE_ORDER_2` PATCH + Supplier Confirmation OData V4；INT-11 BAPI_INCOMINGINVOICE_CREATE 替换为 `API_SUPPLIERINVOICE_PROCESS_SRV` (SAP_COM_0057)；设计原则更新为仅 OData/SOAP；架构图 RFC/BAPI 替换为 SOAP/OAuth2 | Agent |

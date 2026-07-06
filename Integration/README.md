@@ -13,6 +13,50 @@
 
 ---
 
+## 0. 部署模型与集成架构（必读）
+
+### 0.1 部署模型确认
+
+| 项 | 值 |
+|----|-----|
+| **产品** | SAP S/4HANA Cloud, **Public Edition**（公有云版） |
+| **租户 URL** | `REDACTED-SAP-TENANT.example.com` |
+| **判定依据** | 域名 `REDACTED-SAP-TENANT-PATTERN` 为 SAP 公有云多租户域名；`-api` 后缀为 API 端点 |
+| **Client** | `100` |
+| **通信用户** | `REDACTED_SAP_COMM_USER`（通过 Communication Arrangement 授权） |
+
+> ⚠️ **这是公有云，不是本地部署（On-Premise）**。两者的集成方式有本质区别，URS 原稿按本地部署写的 RFC/BAPI 出站方案在公有云下**不成立**，必须改为 OData 写操作。
+
+### 0.2 公有云 vs 本地部署 集成方式对比
+
+| 维度 | 本地部署 (On-Premise) | 公有云 (Public Cloud) ← 本项目 |
+|------|----------------------|------------------------------|
+| API 主协议 | RFC/BAPI + OData + IDoc | **OData V2/V4 + SOAP**（无直接 RFC） |
+| 写操作（出站） | `BAPI_PO_CHANGE` 等 RFC 函数 | **OData PATCH/POST**（通信场景授权） |
+| 事务码（ME22N/MIRO） | 客户可直接用 | 客户不可用，仅通过 API |
+| 数据库表（EKKO 等） | 可直连读取 | 不可直连，仅通过 OData Entity |
+| 访问治理 | 自定义权限对象 `S_RFC` | **Communication Arrangement**（`SAP_COM_xxxx`） |
+| 连接方式 | RFC 库 / 直连 | HTTPS + Basic/OAuth + Communication User |
+
+### 0.3 公有云通信场景（Communication Scenario）授权模型
+
+公有云下**所有 API 访问（读 + 写）**都通过 Communication Arrangement 治理：
+
+1. 每个 `SAP_COM_xxxx` 通信场景定义可用的 OData 服务 + 允许的操作（READ / CREATE / UPDATE / DELETE）
+2. 通信用户 `REDACTED_SAP_COMM_USER` 通过 Arrangement 获得授权
+3. **读权限 ≠ 写权限**：当前实测的 24 个 OK 端点仅验证了 READ，写操作（CREATE/UPDATE）需对应 Arrangement 单独开通
+
+### 0.4 出站场景接口方案修正（RFC → OData）
+
+| 场景 | URS 原方案（本地部署，❌ 公有云不适用） | 公有云正确方案（✅ OData） | 通信场景 | 实测读 | 写权限 |
+|------|---------------------------------------|--------------------------|---------|--------|--------|
+| INT-03 订单确认回传 | RFC `BAPI_PO_CHANGE`（ME22N） | OData V4 **PATCH** `api_purchaseorder_2/PurchaseOrder`（更新供应商确认字段） | SAP_COM_0053 | ✅ 7 entity OK | ⚠️ 待验证 |
+| INT-11 发票校验回传 | RFC `BAPI_INCOMINGINVOICE_CREATE`（MIRO） | OData V2 **POST** `API_SUPPLIERINVOICE_PROCESS_SRV/A_SupplierInvoice`（创建发票校验） | legacy V2 | ✅ 3 entity OK | ⚠️ 待验证 |
+| INT-06 要货确认回传 | OData UPDATE（本就正确） | OData **UPDATE** `API_PURCHASING_SCHEDULE_AGREEMENT_SRV`（更新计划行确认） | SAP_COM_0103 | ⚠️ 未探测 | ⚠️ 未探测 |
+
+> **说明**：公有云下 `BAPI_PO_CHANGE` / `BAPI_INCOMINGINVOICE_CREATE` 等 RFC 函数不可直接调用。采购订单确认通过 OData V4 PATCH 更新 `PurchaseOrder` 的供应商确认相关字段；发票校验通过 OData V2 POST 创建 `A_SupplierInvoice` 记录（等价于 MIRO 过账）。
+
+---
 ## 1. 真实租户连接配置
 
 | 配置项 | 值 | 说明 |
