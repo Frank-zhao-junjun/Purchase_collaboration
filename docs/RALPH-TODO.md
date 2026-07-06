@@ -427,16 +427,17 @@ pytest tests/api/test_user_stories_smoke.py -v
 > 基于 `docs/URS-SAP-S4HANA-Integration.md`，采用 **SDD（subagent-driven-development）** 方法论执行：每条 task 派 fresh implementer subagent + task review + 最终 review。
 > 完整计划见 `docs/superpowers/plans/2026-07-06-sap-s4hana-integration.md`。
 
-### 顶层 TODO
+### 顶层 TODO（V2 实测驱动版，2026-07-06 调整）
 
-- [ ] Phase 0 基础设施闭环：Task 0.1~0.4（模型/连接器/适配器基类/调度器骨架）
-- [ ] Phase 1 入站 P0 闭环：Task 1.1~1.8（INT-01/02/04/05/07/08/09/12）
-- [ ] Phase 2 出站回传闭环：Task 2.1~2.3（INT-03/06/11）
-- [ ] Phase 3 入站 P1 闭环：Task 3.1~3.3（INT-10/13/14/15）
-- [ ] Phase 4 集成管理闭环：Task 4.1~4.4（INT-M01~M06）
-- [ ] Phase 5 管理前端闭环：Task 5.1（日志/监控/配置/开关页面）
-- [ ] Phase 6 全量回归验收：Task 6.1（集成层 + 67 条 US + URS 验收）
+> 基于 SAP 连接实测数据调整：7 个场景真实可用优先接通，3 个 403 用 Mock 过渡。
 
+- [ ] Phase 0 最小基础设施：Task 0.1~0.3（模型/配置 + 真实OData连接器 + 适配器基类/同步编排）
+- [ ] Phase 1 接通真实接口（核心交付）：Task 1.1~1.4（INT-02/13/15/07/09/01/14，7 个 ✅ 场景直连真实 SAP）
+- [ ] Phase 2 Mock 过渡场景：Task 2.1~2.4（INT-05/08/12 用 Mock + INT-10 替代方案）
+- [ ] Phase 3 出站回传：Task 3.1~3.3（INT-03/11 真实写验证 + INT-06 Mock）
+- [ ] Phase 4 集成管理：Task 4.1~4.2（INT-M01~M06）
+- [ ] Phase 5 管理前端：Task 5.1
+- [ ] Phase 6 全量回归验收：Task 6.1
 ### 执行原则（SDD + Ralph）
 
 1. 一次只做 1 条最小 task，fresh implementer subagent 执行。
