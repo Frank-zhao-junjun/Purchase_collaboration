@@ -16,7 +16,8 @@
 - **日志保留**：≥ 90 天，含场景编号/方向/SAP 单据号/平台单据号/同步时间/状态/错误信息（INT-M01-01）。
 - **同步延迟阈值**：入站 15min / 出站 5min 超阈值告警（INT-M03-02）；ERP 心跳探针每 60s 一次（INT-M03-03）。
 - **平台不写回 ERP 业务数据**：出站仅回传「供应商协同结果」（确认/拒绝、ASN、结算单、发票审批）（URS 3.3 原则 1）。
-- **部署模型：SAP S/4HANA Public Cloud（公有云）**，集成协议为 OData V2/V4 over HTTPS，**不适用 RFC/BAPI**。出站写操作用 OData PATCH/POST，经 Communication Arrangement（SAP_COM_xxxx）授权。- **不改业务逻辑**：集成层只替换数据来源，`app/api/` 与 `app/services/` 既有业务路由与领域服务签名不变；现有 67 条 US 烟测必须持续通过。
+- **部署模型：SAP S/4HANA Public Cloud（公有云）**，集成协议为 OData V2/V4 over HTTPS，**不适用 RFC/BAPI**。出站写操作用 OData PATCH/POST，经 Communication Arrangement（SAP_COM_xxxx）授权。
+- **不改业务逻辑**：集成层只替换数据来源，`app/api/` 与 `app/services/` 既有业务路由与领域服务签名不变；现有 67 条 US 烟测必须持续通过。
 - **数据库**：沿用 SQLite（aiosqlite），新增集成相关表与 `app/core/database.Base` 共享同一 engine。
 - **测试纪律**：每个 task 先写失败测试再实现（TDD）；集成测试用 mock 适配器，不依赖真实 SAP；用例串行执行（依赖共享状态 `ST`），不并行。
 
