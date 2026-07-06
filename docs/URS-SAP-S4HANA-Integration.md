@@ -230,7 +230,7 @@
 |------|------|
 | **关联 US** | US-303 |
 | **SAP 数据源** | 采购订单 (Purchase Order, EKKO/EKPO) |
-| **SAP 接口** | OData: `API_PURCHASE_ORDER_PROCESS_SRV` |
+| **SAP 接口** | OData: `API_PURCHASEORDER_PROCESS_SRV` |
 | **同步频率** | 事件推送（ERP 输出 IDoc ORDERS05）+ 每 15 分钟定时补拉 |
 | **数据内容** | 订单号、供应商、工厂、行项目（物料、数量、价格、交货日期）、付款条件、国际贸易条件 |
 | **映射逻辑** | SAP PO → 平台 `PurchaseOrder` + `OrderLineItem` |
@@ -256,7 +256,7 @@
 |------|------|
 | **关联 US** | US-304 |
 | **SAP 数据源** | 采购订单变更 (PO Change, CDPOS/CDHDR) |
-| **SAP 接口** | OData: `API_PURCHASE_ORDER_PROCESS_SRV` (读变更版本) |
+| **SAP 接口** | OData: `API_PURCHASEORDER_PROCESS_SRV` (读变更版本) |
 | **同步频率** | 事件推送（IDoc ORDCHG05）+ 每 15 分钟定时补拉 |
 | **数据内容** | 变更字段、变更前值、变更后值、变更时间、变更人 |
 
@@ -336,7 +336,7 @@
 |------|------|
 | **关联 US** | US-401 |
 | **SAP 数据源** | 采购订单历史 (EKBE)，筛选条件：移动类型 101 且无对应发票校验 |
-| **SAP 接口** | OData: `API_PURCHASE_ORDER_PROCESS_SRV`（读取 PO History） |
+| **SAP 接口** | OData: `API_PURCHASEORDER_PROCESS_SRV`（读取 PO History） |
 | **同步频率** | 定时拉取，每 1 小时 |
 | **数据内容** | 采购订单号、行项目、收货凭证、物料、数量、金额、收货日期、供应商 |
 
@@ -354,7 +354,7 @@
 |------|------|
 | **关联 US** | US-403 |
 | **SAP 数据源** | 供应商财务视图 (LFB1)、公司代码 (T001)、税码 (T007S) |
-| **SAP 接口** | OData: `API_BUSINESS_PARTNER_SRV`（供应商财务视图部分） |
+| **SAP 接口** | OData: `API_BUSINESS_PARTNER`（供应商财务视图部分） |
 | **同步频率** | 定时拉取，每日凌晨 02:00 |
 | **数据内容** | 供应商编号、公司代码、统驭科目、付款条件、税码、币种 |
 
@@ -397,7 +397,7 @@
 |------|------|
 | **关联 US** | US-108（间接关联，供应商资质管理需要主数据） |
 | **SAP 数据源** | 业务伙伴 (Business Partner, BUT000/LFA1)，通用供应商主数据 |
-| **SAP 接口** | OData: `API_BUSINESS_PARTNER_SRV` |
+| **SAP 接口** | OData: `API_BUSINESS_PARTNER` |
 | **同步频率** | 定时拉取，每日凌晨 01:00 |
 | **数据内容** | 供应商编号、名称、税号、地址、联系人、付款条件、供应商类别 |
 
@@ -656,14 +656,14 @@
 | 场景 | OData 服务名 | SAP CDS View | 操作 |
 |------|-------------|-------------|------|
 | INT-01 | API_PLANNED_ORDERS | I_PlannedOrder | READ |
-| INT-02 | API_PURCHASE_ORDER_PROCESS_SRV | I_PurchaseOrder | READ |
-| INT-04 | API_PURCHASE_ORDER_PROCESS_SRV | I_PurchaseOrder | READ (变更版本) |
+| INT-02 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrder | READ |
+| INT-04 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrder | READ (变更版本) |
 | INT-05 | API_PURCHASING_SCHEDULE_AGREEMENT_SRV | I_PurchasingSchedgAgrmt | READ |
 | INT-07 | API_MATERIAL_DOCUMENT_SRV | I_MaterialDocument | READ |
 | INT-08 | API_INSPECTIONLOT_SRV | I_InspectionLot | READ |
-| INT-09 | API_PURCHASE_ORDER_PROCESS_SRV | I_PurchaseOrderHistory | READ |
+| INT-09 | API_PURCHASEORDER_PROCESS_SRV | I_PurchaseOrderHistory | READ |
 | INT-12 | API_JOURNALENTRY_SRV | I_JournalEntry | READ |
-| INT-13 | API_BUSINESS_PARTNER_SRV | I_BusinessPartner | READ |
+| INT-13 | API_BUSINESS_PARTNER | I_BusinessPartner | READ |
 | INT-15 | API_PRODUCT_SRV | I_Product | READ |
 
 ### 12.2 RFC/BAPI 清单

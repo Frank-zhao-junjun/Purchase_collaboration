@@ -236,3 +236,39 @@ SAP_REQUEST_PARAMS: dict = {"$format": "json", "sap-client": "100"}
 5. **INT-01/05/08/12**：4 个场景的 SAP 接口未实测，MockSAPServer 按理论接口实现并标注 `待验证`，真实联调前需补充探测。
 6. **MockSAPServer 配置**：base_url、client、认证方式须与真实租户一致（`REDACTED-SAP-TENANT.example.com` / client 100 / Basic Auth），便于后续切换。
 7. **ODataConnector**：须同时支持 V2（`/sap/opu/odata/sap/`）和 V4（`/sap/opu/odata4/sap/.../srvd_a2x/`）两种路径模式。
+
+---
+
+## 七、SAP 官方 API 目录交叉核对（基于 api.sap.com 标准命名）
+
+> 来源：https://api.sap.com/products/SAPS4HANACLOUD/apis/all（SAP API Business Hub 官方目录）
+> 该页面需 OAuth 登录，以下服务名按 SAP S/4HANA Cloud 标准 OData 服务命名规范核对。
+
+### 7.1 服务名勘误
+
+URS 附录 12.1 中部分服务名与 SAP 官方标准命名/实测租户不一致，实现时以**实测 + 官方标准**为准：
+
+| 场景 | URS 写法（错误） | 正确服务名 | 依据 |
+|------|-----------------|-----------|------|
+| INT-13 | `API_BUSINESS_PARTNER_SRV` | `API_BUSINESS_PARTNER` | 实测 `A_Supplier`/`A_SupplierCompany` 路径为 `/sap/opu/odata/sap/API_BUSINESS_PARTNER/`（无 `_SRV`） |
+| INT-02 | `API_PURCHASE_ORDER_PROCESS_SRV` | V2: `API_PURCHASEORDER_PROCESS_SRV`（注意 PURCHASEORDER 连写）；V4: `api_purchaseorder_2` | 实测 V2 路径 `API_PURCHASEORDER_PROCESS_SRV/A_PurchaseOrder`；V4 推荐 `api_purchaseorder_2`（7 entity OK） |
+
+### 7.2 未探测场景的官方服务确认
+
+以下 4 个场景的 SAP 接口未在 33 端点实测范围内，但服务名符合 SAP 官方标准命名，MockSAPServer 按此实现，真实联调前需补充探测：
+
+| 场景 | 官方服务名 | CDS View | 通信场景 | 备注 |
+|------|-----------|----------|---------|------|
+| INT-01 采购预测 | `API_PLANNED_ORDERS` | I_PlannedOrder | — | 标准服务存在；或改用采购申请 `API_PURCHASEREQ_PROCESS_SRV`（SAP_COM_0102） |
+| INT-05 要货计划 | `API_PURCHASING_SCHEDULE_AGREEMENT_SRV` | I_PurchasingSchedgAgrmt | SAP_COM_0103 | ES-MCP-Server 手册 5.3 已标注该服务 |
+| INT-08 质检结果 | `API_INSPECTIONLOT_SRV` | I_InspectionLot | — | 标准服务存在；或从物料凭证（INT-07）推断质检结果 |
+| INT-12 付款状态 | `API_JOURNALENTRY_SRV` | I_JournalEntry | — | 标准服务存在；过渡期可从供应商发票付款状态推断 |
+
+### 7.3 出站 RFC/BAPI 官方确认
+
+| 场景 | 函数模块 | 事务码 | 官方状态 |
+|------|---------|--------|---------|
+| INT-03 | `BAPI_PO_CHANGE` | ME22N | SAP 标准 BAPI，需 RFC 权限 |
+| INT-11 | `BAPI_INCOMINGINVOICE_CREATE` | MIRO | SAP 标准 BAPI，需 RFC 权限 |
+
+> RFC/BAPI 不在 OData 探测范围，需 SAP Basis 团队开通 `S_RFC` 权限对象并配置通信用户 `REDACTED_SAP_COMM_USER` 的 RFC 授权。
