@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     CORS_ORIGINS: list = ["*"]
     API_V1_PREFIX: str = "/api/v1"
+    SAP_BASE_URL: str = ""
+    SAP_CLIENT: str = "100"
+    SAP_COMM_USER: str = ""
+    SAP_COMM_PASSWORD: str = ""
+    SAP_CREDENTIALS_FILE: str = ""
+    SAP_PROBE_RESULTS_FILE: str = "Integration/probe-latest.json"
 
     class Config:
         env_file = ".env"
