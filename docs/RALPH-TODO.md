@@ -419,3 +419,29 @@ pytest tests/api/test_user_stories_smoke.py -v
 
 如需经 Nginx 验证，使用 `-ThroughNginx` 或 `--nginx`。
 如需干净库重跑，使用 `-Fresh` 或 `--fresh`。
+
+---
+
+## 集成层 Ralph-loop（SAP S/4HANA，SDD 执行）
+
+> 基于 `docs/URS-SAP-S4HANA-Integration.md`，采用 **SDD（subagent-driven-development）** 方法论执行：每条 task 派 fresh implementer subagent + task review + 最终 review。
+> 完整计划见 `docs/superpowers/plans/2026-07-06-sap-s4hana-integration.md`。
+
+### 顶层 TODO
+
+- [ ] Phase 0 基础设施闭环：Task 0.1~0.4（模型/连接器/适配器基类/调度器骨架）
+- [ ] Phase 1 入站 P0 闭环：Task 1.1~1.8（INT-01/02/04/05/07/08/09/12）
+- [ ] Phase 2 出站回传闭环：Task 2.1~2.3（INT-03/06/11）
+- [ ] Phase 3 入站 P1 闭环：Task 3.1~3.3（INT-10/13/14/15）
+- [ ] Phase 4 集成管理闭环：Task 4.1~4.4（INT-M01~M06）
+- [ ] Phase 5 管理前端闭环：Task 5.1（日志/监控/配置/开关页面）
+- [ ] Phase 6 全量回归验收：Task 6.1（集成层 + 67 条 US + URS 验收）
+
+### 执行原则（SDD + Ralph）
+
+1. 一次只做 1 条最小 task，fresh implementer subagent 执行。
+2. 每条 task 先写失败测试再实现（TDD）。
+3. 改完跑最小验证：`pytest backend/tests/integration/test_<scenario>.py -v`（串行）。
+4. task review：派 task-reviewer 审 spec 合规 + 代码质量，Critical/Important 须修复重审。
+5. 每个 Phase 完成跑阶段回归；Phase 6 跑全量回归（含原有 67 条 US）。
+6. 全部完成后派 final code-reviewer 整分支审查。
