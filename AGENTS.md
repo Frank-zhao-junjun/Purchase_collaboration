@@ -382,3 +382,6 @@ npx server -l 5000
 - 更新 `backend/app/config.py`：SECRET_KEY 支持环境变量覆盖
 - 更新 `backend/requirements.txt`：添加 python-jose 依赖
 - 注意：当前为 Demo 级别实现，所有业务路由仍为可选认证模式
+
+
+
