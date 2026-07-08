@@ -1,7 +1,8 @@
-"""
+﻿"""
 Application configuration settings
 """
 from functools import lru_cache
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -15,7 +16,8 @@ class Settings(BaseSettings):
     # SQLite数据库
     DATABASE_URL: str = "sqlite+aiosqlite:///./supply_chain.db"
     DATABASE_URL_SYNC: str = "sqlite:///./supply_chain.db"
-    SECRET_KEY: str = "supply-chain-demo-secret-key-change-in-production"
+    # 生产环境必须通过环境变量 SECRET_KEY 覆盖此值
+    SECRET_KEY: str = os.environ.get("SECRET_KEY", "supply-chain-demo-secret-key-change-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     CORS_ORIGINS: list = ["*"]

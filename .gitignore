@@ -62,3 +62,9 @@ sap-credentials.*
 .env.sap
 # 损坏的测试文件（引用不存在的模块，待修复）
 tests/api/_broken/
+
+# SAP 探针结果（含租户连接信息）
+Integration/probe-*.json
+Integration/probe_sap.py
+Integration/probe-sap-connection.cjs
+Integration/CONNECTION-VERIFICATION*.md

@@ -1,8 +1,14 @@
-# 白酒供应链数字化管控平台 - AGENTS.md
+﻿# 白酒供应链数字化管控平台 - AGENTS.md
 
 ## 项目概览
 
 面向白酒企业的供应链全链路数字化管控系统 Demo，聚焦"采购→到货验收→入库→库存管理"核心链路。
+
+## 默认 LLM 模型
+
+- **模型**: DeepSeek V4 Flash (deepseek-v4-flash)
+- **用途**: 本项目的所有开发、代码生成、分析、审查任务默认使用此模型
+- **覆盖规则**: 如特定任务需使用其他模型（如 DeepSeek Chat），可在具体需求中显式指定
 
 ## 默认开发标准（Agent Skills Plugin）
 
@@ -345,3 +351,34 @@ npx server -l 5000
 - 后端使用 SQLite，数据库文件 `backend/supply_chain.db`，每次启动前通过 `init_db.py` 初始化
 - 前端 Node.js 项目只使用 `pnpm`
 - 9000 端口为系统保留，禁止使用
+
+
+
+
+
+## 安全修复记录
+
+### 2026-07-08: SEC-004 — 从 Git 清除 SAP 连接信息
+- 从 Git 跟踪中移除了以下包含 SAP 连接信息的文件：
+  - `Integration/probe-latest.json`, `Integration/probe-20260706-225527.json`
+  - `Integration/probe-after-unlock.json`, `Integration/probe-2026-07-06.json`
+  - `Integration/probe_sap.py`, `Integration/probe-sap-connection.cjs`
+  - `Integration/CONNECTION-VERIFICATION.md`, `Integration/CONNECTION-VERIFICATION-FINAL.md`
+- 更新 `.gitignore` 防止重新提交
+- 脱敏处理 `Integration/README.md`（移除租户 URL 和用户名）
+- ⚠️ 如需完全清除 Git 历史中的敏感数据，请执行 `git filter-branch` 或 `BFG Repo-Cleaner`
+
+### 2026-07-08: SEC-001 — 添加 API 认证机制
+- 创建 `backend/app/auth.py`：JWT 认证模块
+  - 支持 Bearer Token 认证
+  - Demo 用户数据库（admin/buyer/supplier1/supplier2）
+  - 可选认证模式（未提供 token 时默认 buyer 身份）
+  - 角色区分：buyer（采购端）/ supplier（供应商端）
+- 创建 `backend/app/api/auth.py`：登录/用户信息 API
+  - `POST /auth/login` — 登录获取 token
+  - `GET /auth/me` — 获取当前用户信息
+  - `GET /auth/demo-mode` — 获取 Demo 可用账号
+- 更新 `backend/app/main.py`：注册 auth 路由
+- 更新 `backend/app/config.py`：SECRET_KEY 支持环境变量覆盖
+- 更新 `backend/requirements.txt`：添加 python-jose 依赖
+- 注意：当前为 Demo 级别实现，所有业务路由仍为可选认证模式
