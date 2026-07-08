@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, message, Typography } from 'antd'
 import { login, setSession } from '../auth'
@@ -15,7 +15,7 @@ const Login: React.FC = () => {
       const { token, user } = await login(values.username, values.password)
       setSession(token, user)
       message.success('登录成功')
-      navigate(user.role === 'supplier' ? '/supplier' : '/buyer')
+      navigate('/', { replace: true })
     } catch (e) {
       message.error((e as Error).message || '登录失败')
     } finally {
@@ -65,3 +65,4 @@ const Login: React.FC = () => {
 }
 
 export default Login
+

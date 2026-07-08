@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -117,9 +117,12 @@ function App() {
             </Route>
           </Route>
         </Routes>
+        </RequireAuth>
       </BrowserRouter>
     </ConfigProvider>
   )
 }
 
 export default App
+
+
