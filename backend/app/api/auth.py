@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
 from app.auth import (
+    UserCredentials,
     DEMO_USERS,
     TokenData,
     create_access_token,
@@ -72,3 +73,4 @@ async def get_demo_mode():
             {"username": "supplier2", "role": "supplier", "supplier_id": 2},
         ],
     }
+

@@ -1,4 +1,4 @@
-import api from './request'
+﻿import api from './request'
 
 // Dashboard API
 export const getDashboardMetrics = () => api.get('/dashboard/stats')
@@ -614,4 +614,14 @@ export const resubmitInvoice = (id: number, data: {
   remarks?: string
   invoice_image_url?: string
 }) => api.post(`/financial/invoices/${id}/resubmit`, data)
+
+
+// ============ US-301: 采购预测 Excel 导入 ============
+export const importForecastExcel = (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/supplier-portal/forecasts/import-excel', formData, {
+    timeout: 60000,
+  })
+}
 

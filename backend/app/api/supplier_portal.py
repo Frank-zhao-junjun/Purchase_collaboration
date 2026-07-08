@@ -1,5 +1,5 @@
 """供应商门户协同API - Phase 1: 订单协同闭环"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
@@ -10,7 +10,8 @@ import uuid, json
 from app.core.database import get_db
 from app.models.supply_chain import (
     Supplier, PurchaseOrder, PurchaseOrderItem, Material,
-    ShipmentNote, ShipmentNoteItem, OrderStatus, ShipmentStatus
+    ShipmentNote, ShipmentNoteItem, OrderStatus, ShipmentStatus,
+    PurchaseForecast, ForecastStatus
 )
 from app.schemas.supply_chain import (
     POConfirmRequest, ShipmentNoteCreate, ShipmentNoteUpdate,
@@ -409,3 +410,168 @@ async def list_qualifications(supplier_id: int, db: AsyncSession = Depends(get_d
         return json.loads(supplier.qualifications or "[]")
     except Exception:
         return []
+
+# ==================== 6. 采购预测 (US-301) ====================
+
+@router.get("/forecasts")
+async def list_forecasts(
+    supplier_id: Optional[int] = None,
+    status: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取采购预测列表（采购端/供应商端通用）"""
+    query = (
+        select(PurchaseForecast)
+        .options(selectinload(PurchaseForecast.supplier))
+        .order_by(PurchaseForecast.created_at.desc())
+    )
+    if supplier_id:
+        query = query.where(PurchaseForecast.supplier_id == supplier_id)
+    if status:
+        query = query.where(PurchaseForecast.status == status)
+
+    result = await db.execute(query)
+    forecasts = result.scalars().all()
+
+    response = []
+    for f in forecasts:
+        d = {c.name: getattr(f, c.name) for c in f.__table__.columns}
+        d['supplier_name'] = f.supplier.name if f.supplier else None
+        response.append(d)
+    return response
+
+
+@router.post("/forecasts/import-excel")
+async def import_forecast_excel(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """通过 Excel 导入采购预测数据"""
+    import openpyxl
+    from io import BytesIO
+
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx / .xls 文件")
+
+    contents = await file.read()
+    wb = openpyxl.load_workbook(BytesIO(contents))
+    ws = wb.active
+
+    if ws.max_row < 2:
+        raise HTTPException(status_code=400, detail="Excel 文件为空，请至少包含表头和数据行")
+
+    headers = [str(c.value or "").strip() for c in ws[1]]
+    required = ["物料名称", "预测数量"]
+    for r in required:
+        if not any(r in h for h in headers):
+            raise HTTPException(status_code=400, detail=f"缺少必要列: {r}")
+
+    def col(name):
+        for i, h in enumerate(headers):
+            if name in h:
+                return i
+        return -1
+
+    idx_material = col("物料名称")
+    idx_material_id = col("物料ID")
+    idx_month = col("预测月份")
+    idx_qty = col("预测数量")
+    idx_notes = col("备注")
+
+    if idx_material < 0 or idx_qty < 0:
+        raise HTTPException(status_code=400, detail="Excel 必须包含「物料名称」和「预测数量」列")
+
+    from datetime import datetime
+
+    rows_data = []
+    errors = []
+
+    for row_idx in range(2, ws.max_row + 1):
+        row = [ws.cell(row=row_idx, column=c).value for c in range(1, ws.max_column + 1)]
+        material_name = str(row[idx_material] or "").strip()
+        qty_val = row[idx_qty]
+
+        if not material_name:
+            continue
+
+        try:
+            qty = float(qty_val) if qty_val is not None else 0
+        except (ValueError, TypeError):
+            errors.append(f"第{row_idx}行: 预测数量「{qty_val}」不是有效数字")
+            continue
+
+        material_id = None
+        if idx_material_id >= 0 and row[idx_material_id] is not None:
+            try:
+                material_id = int(float(row[idx_material_id]))
+            except (ValueError, TypeError):
+                pass
+
+        month_str = str(row[idx_month] or "").strip() if idx_month >= 0 else ""
+        notes = str(row[idx_notes] or "").strip() if idx_notes >= 0 else ""
+
+        rows_data.append({
+            "material_id": material_id,
+            "material_name": material_name,
+            "quantity": qty,
+            "expected_month": month_str,
+            "notes": notes,
+        })
+
+    if not rows_data:
+        raise HTTPException(status_code=400, detail="Excel 中无有效数据行")
+
+    supplier_result = await db.execute(
+        select(Supplier).where(Supplier.status == "active")
+    )
+    suppliers = supplier_result.scalars().all()
+
+    if not suppliers:
+        raise HTTPException(status_code=400, detail="没有活跃的供应商，无法创建预测")
+
+    now = datetime.utcnow()
+    created_count = 0
+
+    for supplier in suppliers:
+        forecast = PurchaseForecast(
+            supplier_id=supplier.id,
+            forecast_period=f"{now.year}年{now.month}月",
+            period_start=datetime(now.year, now.month, 1),
+            period_end=datetime(now.year + (now.month // 12), (now.month % 12) + 1, 1) if now.month < 12 else datetime(now.year + 1, 1, 1),
+            items_data=json.dumps(rows_data, ensure_ascii=False),
+            status="published",
+            created_at=now,
+            published_at=now,
+        )
+        db.add(forecast)
+        created_count += 1
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": f"成功从 Excel 导入 {len(rows_data)} 条预测明细，已分发给 {created_count} 个供应商",
+        "items_count": len(rows_data),
+        "suppliers_count": created_count,
+        "errors": errors if errors else None,
+    }
+
+
+@router.get("/forecasts/{forecast_id}")
+async def get_forecast_detail(
+    forecast_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取采购预测详情"""
+    result = await db.execute(
+        select(PurchaseForecast)
+        .options(selectinload(PurchaseForecast.supplier))
+        .where(PurchaseForecast.id == forecast_id)
+    )
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(status_code=404, detail="预测记录不存在")
+
+    d = {c.name: getattr(f, c.name) for c in f.__table__.columns}
+    d['supplier_name'] = f.supplier.name if f.supplier else None
+    return d

@@ -346,3 +346,53 @@ class SupplierAlertResponse(BaseModel):
     supplier_name: Optional[str] = None
     class Config: from_attributes = True
     pending_settlement: int = 0       # 待对账
+
+
+# ==================== 采购预测 ====================
+
+class ForecastItem(BaseModel):
+    """预测明细项"""
+    material_id: Optional[int] = None
+    material_name: str
+    quantity: float
+    expected_month: Optional[str] = None
+    notes: Optional[str] = None
+
+class PurchaseForecastResponse(BaseModel):
+    """采购预测响应"""
+    id: int
+    supplier_id: int
+    supplier_name: Optional[str] = None
+    forecast_period: str
+    period_start: datetime
+    period_end: datetime
+    items_data: str = "[]"
+    status: str = "draft"
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    class Config: from_attributes = True
+# ==================== 采购预测 ====================
+
+class ForecastItem(BaseModel):
+    """预测明细项"""
+    material_id: Optional[int] = None
+    material_name: str
+    quantity: float
+    expected_month: Optional[str] = None
+    notes: Optional[str] = None
+
+class PurchaseForecastResponse(BaseModel):
+    """采购预测响应"""
+    id: int
+    supplier_id: int
+    supplier_name: Optional[str] = None
+    forecast_period: str
+    period_start: datetime
+    period_end: datetime
+    items_data: str = "[]"
+    status: str = "draft"
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    class Config: from_attributes = True
