@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import Layout from './components/Layout'
+import Login from './pages/Login'
+import { getSession } from './auth'
 
 // 采购端页面
 import BuyerHome from './pages/buyer/BuyerHome'
@@ -43,13 +45,23 @@ import SupplierAnnouncementList from './pages/supplier/AnnouncementList'
 
 const theme = { token: { colorPrimary: '#3E5BF2', borderRadius: 4 } }
 
+// 登录守卫：未携带有效会话时展示登录页（SEC-001 前端配套）
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const session = getSession()
+  if (!session) {
+    return <Login />
+  }
+  return <>{children}</>
+}
+
 function App() {
   return (
     <ConfigProvider theme={theme} locale={zhCN}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/buyer" replace />} />
+        <RequireAuth>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Navigate to="/buyer" replace />} />
 
             {/* 采购端 */}
             <Route path="buyer">

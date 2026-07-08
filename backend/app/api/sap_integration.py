@@ -13,12 +13,12 @@ router = APIRouter(prefix="/integration/sap", tags=["SAP集成"])
 
 
 def get_sap_client() -> SapClient:
+    # 密码仅来自环境变量 SAP_COMM_PASSWORD（SEC-005：不再读取明文文件）
     sap_settings = SapClientSettings(
         base_url=settings.SAP_BASE_URL,
         sap_client=settings.SAP_CLIENT,
         username=settings.SAP_COMM_USER,
         password=settings.SAP_COMM_PASSWORD,
-        credentials_file=settings.SAP_CREDENTIALS_FILE,
     )
     return SapClient(settings=sap_settings)
 

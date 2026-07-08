@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { clearSession } from '../auth'
 import { Layout as AntLayout, Menu, Badge, Dropdown, Button } from 'antd'
 import {
   DashboardOutlined, FileTextOutlined, TeamOutlined, ShoppingOutlined,
@@ -138,7 +139,13 @@ const Layout: React.FC = () => {
               { key: 'role', label: portal === 'buyer' ? '采购主管' : '供应商管理员' },
               { type: 'divider' },
               { key: 'exit', label: '退出登录' },
-            ]
+            ],
+            onClick: ({ key }) => {
+              if (key === 'exit') {
+                clearSession()
+                window.location.href = '/login'
+              }
+            },
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <div style={{

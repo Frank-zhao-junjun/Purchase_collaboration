@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 import httpx
 
 from app.integration.endpoints import SapEndpoint
@@ -14,32 +13,21 @@ class SapClientSettings:
     base_url: str
     sap_client: str
     username: str
+    # 密码仅允许来自环境变量 SAP_COMM_PASSWORD，禁止从明文文件读取（SEC-005）
     password: str = ""
-    credentials_file: str = ""
 
     def resolve_password(self) -> str:
-        if self.password:
-            return self.password
-        if not self.credentials_file:
-            raise ValueError("SAP password is not configured")
+        """返回 SAP 密码（必须由环境变量注入）。
 
-        file_text = Path(self.credentials_file).read_text(encoding="utf-8")
-        for line in file_text.splitlines():
-            # 支持半角冒号 ":" 和全角冒号 "："
-            sep_pos = -1
-            for sep in (":", "："):
-                pos = line.find(sep)
-                if pos != -1:
-                    sep_pos = pos
-                    break
-            if sep_pos == -1:
-                continue
-            key, value = line[:sep_pos], line[sep_pos + 1:]
-            if key.strip().lower() == "password":
-                password = value.strip()
-                if password:
-                    return password
-        raise ValueError(f"Password not found in credentials file: {self.credentials_file}")
+        已移除从明文文件（如 user.txt）读取密码的能力：明文凭证文件会被提交到
+        Git，造成凭据泄露。密码统一经由环境变量 SAP_COMM_PASSWORD 注入。
+        """
+        if not self.password:
+            raise ValueError(
+                "SAP 密码未配置：请通过环境变量 SAP_COMM_PASSWORD 注入，"
+                "不要将密码写入明文文件。"
+            )
+        return self.password
 
 
 @dataclass(frozen=True)

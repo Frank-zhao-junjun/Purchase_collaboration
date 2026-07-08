@@ -14,10 +14,10 @@ router = APIRouter(prefix="/auth", tags=["认证管理"])
 
 
 @router.post("/login")
-async def login(username: str, password: str):
-    """用户登录，返回 JWT token"""
-    user = DEMO_USERS.get(username)
-    if not user or user["password"] != password:
+async def login(payload: UserCredentials):
+    """用户登录，返回 JWT token（接受 JSON 请求体）"""
+    user = DEMO_USERS.get(payload.username)
+    if not user or user["password"] != payload.password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
@@ -57,7 +57,7 @@ async def get_me(current_user: TokenData = Depends(get_current_user_required)):
 
 @router.get("/demo-mode")
 async def get_demo_mode():
-    """获取 Demo 模式的默认用户信息和可用账号"""
+    """获取 Demo 模式的默认用户信息和可用账号（不含密码）"""
     return {
         "demo_mode": True,
         "default_user": {
@@ -66,9 +66,9 @@ async def get_demo_mode():
             "role": "buyer",
         },
         "available_accounts": [
-            {"username": "admin", "password": "admin123", "role": "buyer"},
-            {"username": "buyer", "password": "buyer123", "role": "buyer"},
-            {"username": "supplier1", "password": "supplier123", "role": "supplier", "supplier_id": 1},
-            {"username": "supplier2", "password": "supplier123", "role": "supplier", "supplier_id": 2},
+            {"username": "admin", "role": "buyer"},
+            {"username": "buyer", "role": "buyer"},
+            {"username": "supplier1", "role": "supplier", "supplier_id": 1},
+            {"username": "supplier2", "role": "supplier", "supplier_id": 2},
         ],
     }
