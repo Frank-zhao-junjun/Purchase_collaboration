@@ -4,6 +4,20 @@
 
 面向白酒企业的供应链全链路数字化管控系统 Demo，聚焦"采购→到货验收→入库→库存管理"核心链路。
 
+## 默认开发标准（Agent Skills Plugin）
+
+本项目默认采用 Agent Skills 作为后续开发标准，已安装到项目目录 `.agents/skills/`。
+
+执行规则：
+
+1. 任何需求改动先走 spec-driven-development（先规格后实现）。
+2. 所有功能与缺陷修复默认执行 test-driven-development（先测试后实现）。
+3. 提交前必须执行 code-review-and-quality 与 debugging-and-error-recovery 的检查清单。
+4. 涉及接口边界时必须遵循 api-and-interface-design。
+5. 涉及安全、性能、上线发布时，分别执行 security-and-hardening、performance-optimization、shipping-and-launch。
+
+推荐命令流：/spec → /plan → /build → /test → /review → /ship。
+
 
 ## 功能责任矩阵（US Checklist & 责任分工）
 
